@@ -1,6 +1,7 @@
 #include "Typechecker.h"
 #include "Exp.h"
 #include "FuncTable.h"
+#include "Program.h"
 #include "Scope.h"
 #include "Stmt.h"
 #include "VarDecl.h"
@@ -177,7 +178,22 @@ class Typechecker
         // TODO: load builtin function definitions.
     }
 
-    void Check( Program& program ) {}
+    int Check( Program& program )
+    {
+        for( const FuncDefPtr& funcDef : program.GetFunctions() )
+        {
+            try
+            {
+                checkFunction( funcDef.get() );
+            }
+            catch( const TypeError& e )
+            {
+                fprintf(stderr, "Error: %s\n", e.what());
+                return -1;
+            }
+        }
+        return 0;
+    }
 
   private:
     FuncTable m_funcTable;
@@ -201,3 +217,8 @@ class Typechecker
         StmtTypechecker( &scope, m_funcTable, *funcDef ).CheckStmt( funcDef->GetBody() );
     }
 };
+
+int Typecheck( Program& program )
+{
+    return Typechecker().Check( program );
+}

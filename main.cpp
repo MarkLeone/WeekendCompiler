@@ -5,6 +5,7 @@
 #include "Printer.h"
 #include "Program.h"
 #include "TokenStream.h"
+#include "Typechecker.h"
 #include <iostream>
 
 int main( int argc, const char* const* argv )
@@ -26,6 +27,10 @@ int main( int argc, const char* const* argv )
     ProgramPtr  program( ParseProgram( tokens ) );
     if( !program )
         return -1;  // Error already reported
+
+    int status = Typecheck( *program );
+    if( status )
+        return status;
 
     std::cout << *program << std::endl;
     return 0;
