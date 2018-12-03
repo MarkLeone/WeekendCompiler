@@ -26,7 +26,7 @@ Token Lexer(const char*& source)
         id       { return Token(std::string(begin, source)); }
         "("      { return kTokenLparen; }
         ")"      { return kTokenRparen; }
-        "        {"         { return kTokenLbrace; }
+        "{"      { return kTokenLbrace; }
         "}"      { return kTokenRbrace; }
         ","      { return kTokenComma; }
         "="      { return kTokenEq; }

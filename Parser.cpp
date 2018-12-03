@@ -174,7 +174,7 @@ static StmtPtr parseStmt( TokenStream& tokens )
 
 static SeqStmtPtr parseSeqStmt( TokenStream& tokens )
 {
-    skipToken( kTokenLparen, tokens );
+    skipToken( kTokenLbrace, tokens );
     std::vector<StmtPtr> stmts;
     while( *tokens != kTokenRbrace )
     {
