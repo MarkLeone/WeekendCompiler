@@ -1,23 +1,32 @@
 #include "Codegen.h"
 #include "CodegenUtils.h"
 #include "Exp.h"
+#include "FuncDef.h"
+#include "Program.h"
 #include "Stmt.h"
 #include "Visitor.h"
 
+#include <llvm/IR/Argument.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/Verifier.h>
+#include <llvm/Support/raw_ostream.h>
 
 using namespace llvm;
+
+using SymbolTable = std::map<const VarDecl*, Value*>;
+using FunctionTable = std::map<const FuncDef*, Function*>;
 
 class CodegenBase
 {
   public:
-    CodegenBase( LLVMContext* context, Module* module )
+    CodegenBase( LLVMContext* context, Module* module, IRBuilder<>* builder )
         : m_context( context )
         , m_module( module )
-        , m_builder( *context )
+        , m_builder( builder )
         , m_utils( context, module )
+        , m_intType( IntegerType::get( *m_context, 32 ) )
     {
     }
 
@@ -25,22 +34,38 @@ class CodegenBase
 
     Module* GetModule() { return m_module; }
 
-    IRBuilder<>* GetBuilder() { return &m_builder; }
+    IRBuilder<>* GetBuilder() { return m_builder; }
 
     CodegenUtils* GetUtils() { return &m_utils; }
+
+    llvm::Type* ConvertType(::Type type)
+    {
+        if (type == kTypeInt)
+            return m_intType;
+        assert( false && "Invalid type");
+        return m_intType;
+    }
+
+    llvm::Type* GetIntType() const { return m_intType; }
+
+    Constant* GetInt( int i ) const { return ConstantInt::get( GetIntType(), i, true /*isSigned*/ ); }
 
   protected:
     LLVMContext* m_context;
     Module*      m_module;
-    IRBuilder<>  m_builder;
+    IRBuilder<>* m_builder;
     CodegenUtils m_utils;
+    llvm::Type*  m_intType;
 };
 
 class CodegenExp : public ExpVisitor, CodegenBase
 {
   public:
-    CodegenExp( LLVMContext* context, Module* module )
-        : CodegenBase( context, module )
+    CodegenExp( LLVMContext* context, Module* module, IRBuilder<>* builder,
+                SymbolTable* symbols, FunctionTable* functions )
+        : CodegenBase( context, module, builder )
+        , m_symbols( symbols )
+        , m_functions( functions )
     {
     }
 
@@ -50,58 +75,260 @@ class CodegenExp : public ExpVisitor, CodegenBase
 
     void* Visit( VarExp& exp ) override
     {
-        return nullptr;  // XXX
+        // The typechecker links variable references to their declarations.
+        const VarDecl* varDecl = exp.GetVarDecl();
+        assert( varDecl );
+
+        // An llvm::Value was associated with the variable when its declaration was processed.
+        SymbolTable::const_iterator it = m_symbols->find( varDecl );
+        assert( it != m_symbols->end() );
+        Value* value = it->second;
+
+        // The value is either a function parameter or a pointer to storage for a local variable.
+        switch( varDecl->GetKind() )
+        {
+            case VarDecl::kParam:
+                return value;
+            case VarDecl::kLocal:
+                return GetBuilder()->CreateLoad( value, varDecl->GetName() );
+        }
+        assert(false && "unreachable");
+        return nullptr;
     }
 
     void* Visit( CallExp& exp ) override
     {
-        return nullptr;  // XXX
+        // The typechecker link function call sites to their definitions.
+        const FuncDef* funcDef = exp.GetFuncDef();
+        assert( funcDef );
+
+        // An llvm::Function was associated with the function when its definition was processed.
+        FunctionTable::const_iterator it = m_functions->find( funcDef );
+        assert( it != m_functions->end() );
+        Function* function = it->second;
+
+        // Convert the arguments to LLVM values.
+        std::vector<Value*> argValues;
+        argValues.reserve( exp.GetArgs().size() );
+        for( const ExpPtr& arg : exp.GetArgs() )
+        {
+            argValues.push_back( Codegen( *arg ) );
+        }
+
+        // Generate LLVM function call.
+        return GetBuilder()->CreateCall( function, argValues, funcDef->GetName() );
     }
+
+  private:
+    SymbolTable* m_symbols;
+    FunctionTable* m_functions;
 };
 
 
 class CodegenStmt : public StmtVisitor, CodegenBase
 {
   public:
-    CodegenStmt( LLVMContext* context, Module* module )
-        : CodegenBase( context, module )
+    CodegenStmt( LLVMContext* context, Module* module, IRBuilder<>* builder,
+                 SymbolTable* symbols, FunctionTable* functions, Function* currentFunction )
+        : CodegenBase( context, module, builder )
+        , m_symbols( symbols )
+        , m_functions( functions )
+        , m_currentFunction( currentFunction )
+        , m_codegenExp( context, module, builder, symbols, functions )
     {
     }
 
-    void Visit( CallStmt& stmt ) override {}
+    void Codegen( const Stmt& stmt )
+    {
+        const_cast<Stmt&>( stmt ).Dispatch( *this );
+    }
 
-    void Visit( AssignStmt& stmt ) override {}
+    void Visit( CallStmt& stmt ) override
+    {
+        m_codegenExp.Codegen( stmt.GetCallExp() );
+    }
 
-    void Visit( DeclStmt& stmt ) override {}
+    void Visit( AssignStmt& stmt ) override
+    {
+        // The typechecker links assignments to variable declarations.  Assignments to function
+        // parameters are prohibited by the typechecker.
+        const VarDecl* varDecl = stmt.GetVarDecl();
+        assert( varDecl && varDecl->GetKind() == VarDecl::kLocal );
 
-    void Visit( ReturnStmt& stmt ) override {}
+        // The symbol table maps local variables to stack-allocated storage.
+        SymbolTable::const_iterator it = m_symbols->find( varDecl );
+        assert( it != m_symbols->end() );
+        Value* location = it->second;
 
-    void Visit( SeqStmt& stmt ) override {}
+        // Generate code for the rvalue and store it.
+        Value* rvalue = m_codegenExp.Codegen( stmt.GetRvalue() );
+        GetBuilder()->CreateStore(rvalue, location);
+    }
 
-    void Visit( IfStmt& stmt ) override {}
+    void Visit( DeclStmt& stmt ) override
+    {
+        const VarDecl* varDecl = stmt.GetVarDecl();
+        llvm::Type* type = ConvertType(varDecl->GetType());
+        
+        // Generate an "alloca" instruction, which goes in entry block of the current function.
+        IRBuilder<> allocaBuilder( &m_currentFunction->getEntryBlock() );
+        Value* location = allocaBuilder.CreateAlloca( type, nullptr /*arraySize*/, varDecl->GetName() );
 
-    void Visit( WhileStmt& stmt ) override {}
+        // Store the variable location in the symbol table.
+        m_symbols->insert( SymbolTable::value_type( varDecl, location ) );
+
+        // Generate code for the initializer (if any) and store it.
+        if (stmt.HasInitExp())
+        {
+            Value* rvalue = m_codegenExp.Codegen( stmt.GetInitExp() );
+            GetBuilder()->CreateStore(rvalue, location);
+        }
+    }
+
+    void Visit( ReturnStmt& stmt ) override
+    {
+        Value* result = m_codegenExp.Codegen( stmt.GetExp() );
+        GetBuilder()->CreateRet( result );
+    }
+
+    void Visit( SeqStmt& seq ) override
+    {
+        for( const StmtPtr& stmt : seq.Get() )
+        {
+            Codegen( *stmt );
+        }
+    }
+
+    void Visit( IfStmt& stmt ) override
+    {
+        // Generate code for the conditional expression.
+        Value* intCondition = m_codegenExp.Codegen( stmt.GetCondExp() );
+
+        // Convert the integer conditional expresison to a boolean (i1) using a comparison.
+        Value* boolCondition = GetBuilder()->CreateICmpNE( intCondition, GetInt( 0 ) );
+
+        // Create basic blocks for "then" branch, "else" branch (if any), and the join point.
+        BasicBlock* thenBlock = BasicBlock::Create( *GetContext(), "then", m_currentFunction );
+        BasicBlock* elseBlock = stmt.HasElseStmt() ? BasicBlock::Create( *GetContext(), "else", m_currentFunction ) : nullptr;
+        BasicBlock* joinBlock = BasicBlock::Create( *GetContext(), "join", m_currentFunction );
+
+        // Create a conditional branch.
+        GetBuilder()->CreateCondBr( boolCondition, thenBlock, elseBlock ? elseBlock : joinBlock );
+
+        // Generate code for "then" branch, followed by an unconditional branch to the join block.
+        GetBuilder()->SetInsertPoint( thenBlock );
+        Codegen( stmt.GetThenStmt() );
+        GetBuilder()->CreateBr( joinBlock );
+
+        // If present, generate code for "else" branch.
+        if( stmt.HasElseStmt() )
+        {
+            GetBuilder()->SetInsertPoint( elseBlock );
+            Codegen( stmt.GetElseStmt() );
+            GetBuilder()->CreateBr( joinBlock );
+        }
+
+        // Set the builder insertion point in the join block.
+        GetBuilder()->SetInsertPoint( joinBlock );
+    }
+
+    void Visit( WhileStmt& stmt ) override
+    {
+        // Create a basic block for the start of the loop.
+        BasicBlock* loopBlock = BasicBlock::Create( *GetContext(), "loop", m_currentFunction );
+        GetBuilder()->CreateBr( loopBlock );
+        GetBuilder()->SetInsertPoint( loopBlock );
+
+        // Generate code for the loop condition.
+        Value* intCondition  = m_codegenExp.Codegen( stmt.GetCondExp() );
+        Value* boolCondition = GetBuilder()->CreateICmpNE( intCondition, GetInt( 0 ) );
+
+        // Create basic blocks for the loop body and the join point.
+        BasicBlock* bodyBlock = BasicBlock::Create( *GetContext(), "body", m_currentFunction );
+        BasicBlock* joinBlock = BasicBlock::Create( *GetContext(), "join", m_currentFunction );
+
+        // Create a conditional branch.
+        GetBuilder()->CreateCondBr( boolCondition, bodyBlock, joinBlock );
+
+        // Generate code for the loop body, followed by an unconditional branch to the loop head.
+        GetBuilder()->SetInsertPoint( bodyBlock );
+        Codegen( stmt.GetBodyStmt() );
+        GetBuilder()->CreateBr( loopBlock );
+
+        // Set the builder insertion point in the join block.
+        GetBuilder()->SetInsertPoint( joinBlock );
+    }
+
+  private:
+    SymbolTable*   m_symbols;
+    FunctionTable* m_functions;
+    Function*      m_currentFunction;
+    CodegenExp     m_codegenExp;
 };
 
 class CodegenFunc : public CodegenBase
 {
   public:
-    CodegenFunc( LLVMContext* context, Module* module )
-        : CodegenBase( context, module )
+    CodegenFunc( LLVMContext* context, Module* module, FunctionTable* functions )
+        : CodegenBase( context, module, &m_builder )
+        , m_builder( *context )
+        , m_functions( functions )
     {
     }
-};
 
-class Codegen
-{
-  public:
-    Codegen()
-        : m_context()
-        , m_module()
+    void Codegen( const FuncDef* funcDef )
     {
+        // Convert parameter types to LLVM types.
+        const std::vector<VarDeclPtr>& params = funcDef->GetParams();
+        std::vector<llvm::Type*> paramTypes;
+        paramTypes.reserve( params.size() );
+        for( const VarDeclPtr& param : params )
+        {
+            paramTypes.push_back( ConvertType( param->GetType() ) );
+        }
+
+        // Construct LLVM function type and function definition.
+        llvm::Type*   returnType = ConvertType( funcDef->GetReturnType() );
+        FunctionType* funcType   = FunctionType::get( returnType, paramTypes, false /*isVarArg*/ );
+        Function* function = Function::Create( funcType, Function::ExternalLinkage, funcDef->GetName(), GetModule() );
+
+        // Update the function table.
+        m_functions->insert( FunctionTable::value_type( funcDef, function ) );
+
+        // Construct a symbol table that maps the parameter declarations to the LLVM function parameters.
+        SymbolTable symbols;
+        size_t i = 0;
+        for( Argument& arg : function->args() )
+        {
+            symbols.insert( SymbolTable::value_type( params[i].get(), &arg ) );
+            ++i;
+        }
+
+        // Create entry block and use it as the builder's insertion point.
+        BasicBlock* block = BasicBlock::Create(*GetContext(), "entry", function);
+        GetBuilder()->SetInsertPoint(block);
+
+        // Generate code for the body of the function.
+        CodegenStmt codegen( GetContext(), GetModule(), GetBuilder(), &symbols, m_functions, function );
+        codegen.Codegen( funcDef->GetBody() );
+
+        // Note: it's the user's responsiblity to ensure that the function ends with a return statement.
+        // TODO: verify this in the typechecker?
     }
 
   private:
-    LLVMContext             m_context;
-    std::unique_ptr<Module> m_module;
+    IRBuilder<> m_builder;
+    FunctionTable* m_functions;
 };
+
+std::unique_ptr<Module> Codegen(LLVMContext* context, const Program& program)
+{
+    std::unique_ptr<Module> module( new Module( "module", *context ) );
+    FunctionTable functions;
+    for( const FuncDefPtr& funcDef : program.GetFunctions() )
+    {
+        CodegenFunc( context, module.get(), &functions ).Codegen( funcDef.get() );
+    } 
+    assert(!verifyModule(*module, &llvm::errs()));
+    return std::move( module );
+}

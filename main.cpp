@@ -6,6 +6,9 @@
 #include "Program.h"
 #include "TokenStream.h"
 #include "Typechecker.h"
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/Support/raw_ostream.h>
 #include <iostream>
 
 int main( int argc, const char* const* argv )
@@ -31,7 +34,11 @@ int main( int argc, const char* const* argv )
     int status = Typecheck( *program );
     if( status )
         return status;
+    // std::cout << *program << std::endl;
 
-    std::cout << *program << std::endl;
+    llvm::LLVMContext context;
+    std::unique_ptr<llvm::Module> module( Codegen( &context, *program ) );
+    llvm::outs() << *module;
+
     return 0;
 }

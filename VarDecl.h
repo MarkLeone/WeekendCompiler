@@ -30,9 +30,9 @@ class VarDecl
     const std::string& GetName() const { return m_name; }
 
   private:
-    Kind        m_kind;
-    Type        m_type;
-    std::string m_name;
+    Kind         m_kind;
+    Type         m_type;
+    std::string  m_name;
 };
 
 using VarDeclPtr = std::unique_ptr<VarDecl>;
