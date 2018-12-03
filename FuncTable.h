@@ -7,19 +7,19 @@
 
 class FuncTable
 {
-public:
-    const FuncDef* Find(std::string name) const
+  public:
+    const FuncDef* Find( std::string name ) const
     {
-	MapType::const_iterator it = m_map.find(name);
-	return it == m_map.end() ? nullptr : it->second;
+        MapType::const_iterator it = m_map.find( name );
+        return it == m_map.end() ? nullptr : it->second;
     }
 
-    bool Insert(const FuncDef* funcDef)
+    bool Insert( const FuncDef* funcDef )
     {
-	return m_map.insert(MapType::value_type(funcDef->GetName(), funcDef)).second;
+        return m_map.insert( MapType::value_type( funcDef->GetName(), funcDef ) ).second;
     }
 
-private:
+  private:
     using MapType = std::unordered_map<std::string, const FuncDef*>;
     MapType m_map;
 };

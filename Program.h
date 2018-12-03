@@ -8,12 +8,12 @@ using FuncDefPtr = std::unique_ptr<FuncDef>;
 
 class Program
 {
-public:
+  public:
     const std::vector<FuncDefPtr>& GetFunctions() const { return m_functions; }
 
     std::vector<FuncDefPtr>& GetFunctions() { return m_functions; }
 
-private:
+  private:
     std::vector<FuncDefPtr> m_functions;
 };
 

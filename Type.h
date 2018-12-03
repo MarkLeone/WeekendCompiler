@@ -5,18 +5,20 @@
 
 enum Type
 {
-   kTypeUnknown,
-   kTypeInt
+    kTypeUnknown,
+    kTypeInt
 };
 
-inline const char* ToString(Type type)
+inline const char* ToString( Type type )
 {
-    switch (type)
+    switch( type )
     {
-      case kTypeUnknown: return "<unknown>";
-      case kTypeInt: return "int";
+        case kTypeUnknown:
+            return "<unknown>";
+        case kTypeInt:
+            return "int";
     }
-    assert(false && "Unhandled type");
+    assert( false && "Unhandled type" );
     return "";
 }
 

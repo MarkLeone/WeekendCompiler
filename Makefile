@@ -1,5 +1,5 @@
 
-CXXFLAGS := -Wall -g
+CXXFLAGS := -Wall -g -std=c++14
 DEPFLAGS = -MT $@ -MMD -MP -MF $*.d
 
 LLVM_SRC := c:/Users/mleone/src/llvm-7.0.0/

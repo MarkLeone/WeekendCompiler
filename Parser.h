@@ -5,6 +5,6 @@
 
 class TokenStream;
 
-ProgramPtr ParseProgram(TokenStream& tokens);
+ProgramPtr ParseProgram( TokenStream& tokens );
 
 #endif
