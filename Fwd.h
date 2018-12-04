@@ -4,8 +4,9 @@
 #include <memory>
 
 class Exp;
+class BoolExp;
+class IntExp;
 class CallExp;
-class ConstantExp;
 class VarExp;
 
 class Stmt;

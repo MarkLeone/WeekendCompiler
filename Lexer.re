@@ -12,12 +12,14 @@ Token Lexer(const char*& source)
 
         integer     = "-"?[0-9]+;
         id          = [a-zA-Z_][a-zA-Z_0-9]*;
-        keyword     = "if" | "int" | "return" | "while";
         punctuation = "(" | ")" | "{" | "}" | "=" | "," | ";";
         space       = [ \t\r\n]*;
         eof         = "\x00";
 
         integer  { return Token(atoi(begin)); }
+        "bool"   { return kTokenBool; }
+        "true"   { return kTokenTrue; }
+        "false"  { return kTokenFalse; }
         "int"    { return kTokenInt; }
         "if"     { return kTokenIf; }
         "else"   { return kTokenElse; }

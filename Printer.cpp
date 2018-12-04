@@ -15,12 +15,18 @@ class ExpPrinter : public ExpVisitor
 
     void Print( const Exp& exp ) { const_cast<Exp&>( exp ).Dispatch( *this ); }
 
-    void* Visit( ConstantExp& exp ) override
+    void* Visit( BoolExp& exp ) override
+    {
+        m_out << (exp.GetValue() ? "true" : "false");
+        return nullptr;
+    }
+
+    void* Visit( IntExp& exp ) override
     {
         m_out << exp.GetValue();
         return nullptr;
     }
-
+    
     void* Visit( VarExp& exp ) override
     {
         m_out << exp.GetName();

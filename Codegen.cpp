@@ -1,5 +1,4 @@
 #include "Codegen.h"
-#include "CodegenUtils.h"
 #include "Exp.h"
 #include "FuncDef.h"
 #include "Program.h"
@@ -25,7 +24,7 @@ class CodegenBase
         : m_context( context )
         , m_module( module )
         , m_builder( builder )
-        , m_utils( context, module )
+        , m_boolType( IntegerType::get( *m_context, 1 ) )
         , m_intType( IntegerType::get( *m_context, 32 ) )
     {
     }
@@ -36,17 +35,28 @@ class CodegenBase
 
     IRBuilder<>* GetBuilder() { return m_builder; }
 
-    CodegenUtils* GetUtils() { return &m_utils; }
 
     llvm::Type* ConvertType(::Type type)
     {
-        if (type == kTypeInt)
-            return m_intType;
-        assert( false && "Invalid type");
+        switch (type)
+        {
+            case kTypeBool:
+                return m_boolType;
+            case kTypeInt:
+                return m_intType;
+            case kTypeUnknown:
+                assert( false && "Invalid type" );
+                return m_intType;
+        }
+        assert( false && "Invalid type" );
         return m_intType;
     }
 
+    llvm::Type* GetBoolType() const { return m_boolType; }
+
     llvm::Type* GetIntType() const { return m_intType; }
+
+    Constant* GetBool( bool b ) const { return ConstantInt::get( GetBoolType(), int(b), false /*isSigned*/ ); }
 
     Constant* GetInt( int i ) const { return ConstantInt::get( GetIntType(), i, true /*isSigned*/ ); }
 
@@ -54,7 +64,7 @@ class CodegenBase
     LLVMContext* m_context;
     Module*      m_module;
     IRBuilder<>* m_builder;
-    CodegenUtils m_utils;
+    llvm::Type*  m_boolType;
     llvm::Type*  m_intType;
 };
 
@@ -71,7 +81,9 @@ class CodegenExp : public ExpVisitor, CodegenBase
 
     Value* Codegen( const Exp& exp ) { return reinterpret_cast<Value*>( const_cast<Exp&>( exp ).Dispatch( *this ) ); }
 
-    void* Visit( ConstantExp& exp ) override { return m_utils.MakeInt32( exp.GetValue() ); }
+    void* Visit( BoolExp& exp ) override { return GetBool( exp.GetValue() ); }
+
+    void* Visit( IntExp& exp ) override { return GetInt( exp.GetValue() ); }
 
     void* Visit( VarExp& exp ) override
     {
@@ -202,10 +214,7 @@ class CodegenStmt : public StmtVisitor, CodegenBase
     void Visit( IfStmt& stmt ) override
     {
         // Generate code for the conditional expression.
-        Value* intCondition = m_codegenExp.Codegen( stmt.GetCondExp() );
-
-        // Convert the integer conditional expresison to a boolean (i1) using a comparison.
-        Value* boolCondition = GetBuilder()->CreateICmpNE( intCondition, GetInt( 0 ) );
+        Value* condition = codegenCondExp( stmt.GetCondExp() );
 
         // Create basic blocks for "then" branch, "else" branch (if any), and the join point.
         BasicBlock* thenBlock = BasicBlock::Create( *GetContext(), "then", m_currentFunction );
@@ -213,7 +222,7 @@ class CodegenStmt : public StmtVisitor, CodegenBase
         BasicBlock* joinBlock = BasicBlock::Create( *GetContext(), "join", m_currentFunction );
 
         // Create a conditional branch.
-        GetBuilder()->CreateCondBr( boolCondition, thenBlock, elseBlock ? elseBlock : joinBlock );
+        GetBuilder()->CreateCondBr( condition, thenBlock, elseBlock ? elseBlock : joinBlock );
 
         // Generate code for "then" branch, followed by an unconditional branch to the join block.
         GetBuilder()->SetInsertPoint( thenBlock );
@@ -240,15 +249,14 @@ class CodegenStmt : public StmtVisitor, CodegenBase
         GetBuilder()->SetInsertPoint( loopBlock );
 
         // Generate code for the loop condition.
-        Value* intCondition  = m_codegenExp.Codegen( stmt.GetCondExp() );
-        Value* boolCondition = GetBuilder()->CreateICmpNE( intCondition, GetInt( 0 ) );
+        Value* condition = codegenCondExp( stmt.GetCondExp() );
 
         // Create basic blocks for the loop body and the join point.
         BasicBlock* bodyBlock = BasicBlock::Create( *GetContext(), "body", m_currentFunction );
         BasicBlock* joinBlock = BasicBlock::Create( *GetContext(), "join", m_currentFunction );
 
         // Create a conditional branch.
-        GetBuilder()->CreateCondBr( boolCondition, bodyBlock, joinBlock );
+        GetBuilder()->CreateCondBr( condition, bodyBlock, joinBlock );
 
         // Generate code for the loop body, followed by an unconditional branch to the loop head.
         GetBuilder()->SetInsertPoint( bodyBlock );
@@ -264,6 +272,17 @@ class CodegenStmt : public StmtVisitor, CodegenBase
     FunctionTable* m_functions;
     Function*      m_currentFunction;
     CodegenExp     m_codegenExp;
+
+    Value* codegenCondExp( const Exp& exp )
+    {
+        Value* condition = m_codegenExp.Codegen( exp );
+        if ( exp.GetType() == kTypeBool )
+            return condition;
+
+        // Convert the integer conditional expresison to a boolean (i1) using a comparison.
+        assert( exp.GetType() == kTypeInt );
+        return GetBuilder()->CreateICmpNE( condition, GetInt( 0 ) );
+    }
 };
 
 class CodegenFunc : public CodegenBase

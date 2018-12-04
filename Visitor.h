@@ -6,9 +6,10 @@
 class ExpVisitor
 {
   public:
-    virtual void* Visit( ConstantExp& exp ) = 0;
-    virtual void* Visit( VarExp& exp )      = 0;
-    virtual void* Visit( CallExp& exp )     = 0;
+    virtual void* Visit( BoolExp& exp ) = 0;
+    virtual void* Visit( IntExp& exp )  = 0;
+    virtual void* Visit( VarExp& exp )  = 0;
+    virtual void* Visit( CallExp& exp ) = 0;
 };
 
 class StmtVisitor

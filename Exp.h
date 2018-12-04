@@ -12,8 +12,8 @@ class ExpVisitorBase;
 class Exp
 {
   public:
-    Exp()
-        : m_type( kTypeUnknown )
+    explicit Exp( Type type = kTypeUnknown )
+        : m_type( type )
     {
     }
 
@@ -25,16 +25,34 @@ class Exp
     virtual void* Dispatch( ExpVisitor& visitor ) = 0;
 
   private:
-    Type m_type;  // Assigned by typechecker
+    Type m_type;  // Set by typechecker, except for constants (BoolExp and IntExp).
 };
 
 using ExpPtr = std::unique_ptr<Exp>;
 
-class ConstantExp : public Exp
+class BoolExp : public Exp
 {
   public:
-    ConstantExp( int value )
-        : m_value( value )
+    BoolExp( bool value )
+        : Exp( kTypeBool )
+        , m_value( value )
+    {
+    }
+
+    bool GetValue() const { return m_value; }
+
+    void* Dispatch( ExpVisitor& visitor ) override { return visitor.Visit( *this ); }
+
+  private:
+    bool m_value;
+};
+
+class IntExp : public Exp
+{
+  public:
+    IntExp( int value )
+        : Exp( kTypeInt )
+        , m_value( value )
     {
     }
 

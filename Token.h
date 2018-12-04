@@ -14,6 +14,9 @@ enum TokenTag
     kTokenId,
 
     // Keywords:
+    kTokenBool,
+    kTokenTrue,
+    kTokenFalse,
     kTokenInt,
     kTokenIf,
     kTokenElse,

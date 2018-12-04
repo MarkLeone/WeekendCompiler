@@ -12,6 +12,9 @@ std::string Token::ToString() const
             return stream.str();
         }
         case kTokenId:        return GetId();
+        case kTokenBool:      return "bool";
+        case kTokenTrue:      return "true";
+        case kTokenFalse:     return "false";
         case kTokenInt:       return "int";
         case kTokenIf:        return "if";
         case kTokenElse:      return "else";

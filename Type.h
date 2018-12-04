@@ -6,6 +6,7 @@
 enum Type
 {
     kTypeUnknown,
+    kTypeBool,
     kTypeInt
 };
 
@@ -15,6 +16,8 @@ inline const char* ToString( Type type )
     {
         case kTypeUnknown:
             return "<unknown>";
+        case kTypeBool:
+            return "bool";
         case kTypeInt:
             return "int";
     }

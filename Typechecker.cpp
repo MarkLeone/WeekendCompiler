@@ -28,12 +28,18 @@ class ExpTypechecker : public ExpVisitor
 
     void Check( const Exp& exp ) { const_cast<Exp&>( exp ).Dispatch( *this ); }
 
-    void* Visit( ConstantExp& exp ) override
+    void* Visit( BoolExp& exp ) override
     {
-        exp.SetType( kTypeInt );
+        assert( exp.GetType() == kTypeBool );
         return nullptr;
     }
 
+    void* Visit( IntExp& exp ) override
+    {
+        assert( exp.GetType() == kTypeInt );
+        return nullptr;
+    }
+    
     void* Visit( VarExp& exp ) override
     {
         // Link the variable use to its declaration.
@@ -148,9 +154,7 @@ class StmtTypechecker : public StmtVisitor
 
     void Visit( IfStmt& stmt ) override
     {
-        CheckExp( stmt.GetCondExp() );
-        if( stmt.GetCondExp().GetType() != kTypeInt )
-            throw TypeError( "Expected integer condition expression" );
+        CheckCondExp( stmt.GetCondExp() );
         CheckStmt( stmt.GetThenStmt() );
         if( stmt.HasElseStmt() )
             CheckStmt( stmt.GetElseStmt() );
@@ -158,10 +162,21 @@ class StmtTypechecker : public StmtVisitor
 
     void Visit( WhileStmt& stmt ) override
     {
-        CheckExp( stmt.GetCondExp() );
-        if( stmt.GetCondExp().GetType() != kTypeInt )
-            throw TypeError( "Expected integer condition expression" );
+        CheckCondExp( stmt.GetCondExp() );
         CheckStmt( stmt.GetBodyStmt() );
+    }
+
+    void CheckCondExp( const Exp& exp)
+    {
+        CheckExp( exp );
+        switch (exp.GetType())
+        {
+            case kTypeBool:
+            case kTypeInt:
+                return;
+            default:
+                throw TypeError( "Expected integer condition expression" );
+        }
     }
 
   private:

@@ -30,22 +30,18 @@ static ExpPtr parseExp( TokenStream& tokens )
     Token token( *tokens++ );
     switch( token.GetTag() )
     {
-        case kTokenNum:
-        {
-            return ExpPtr( new ConstantExp( token.GetNum() ) );
-        }
+        case kTokenTrue:  return ExpPtr( new BoolExp( true ) );
+        case kTokenFalse: return ExpPtr( new BoolExp( false ) );
+        case kTokenNum:   return ExpPtr( new IntExp( token.GetNum() ) );
         case kTokenId:
         {
-            const std::string& name = token.GetId();
             if( *tokens == kTokenLparen )
-                return ExpPtr( new CallExp( name, parseArgs( tokens ) ) );
+                return ExpPtr( new CallExp( token.GetId(), parseArgs( tokens ) ) );
             else
-                return ExpPtr( new VarExp( name ) );
+                return ExpPtr( new VarExp( token.GetId() ) );
         }
         default:
-        {
             throw ParseError( std::string( "Unexpected token: " ) + token.ToString() );
-        }
     }
 }
 
@@ -71,6 +67,8 @@ static Type parseType( TokenStream& tokens )
     Token typeName( *tokens++ );
     switch( typeName.GetTag() )
     {
+        case kTokenBool:
+            return kTypeBool;
         case kTokenInt:
             return kTypeInt;
         default:
@@ -118,6 +116,7 @@ static StmtPtr parseStmt( TokenStream& tokens )
             }
         }
         case kTokenInt:
+        case kTokenBool:
         {
             // Declaration
             VarDeclPtr varDecl( parseVarDecl( VarDecl::kLocal, tokens ) );
