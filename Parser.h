@@ -3,8 +3,9 @@
 
 #include "Fwd.h"
 
+class Program;
 class TokenStream;
 
-ProgramPtr ParseProgram( TokenStream& tokens );
+int ParseProgram( TokenStream& tokens, Program* program );
 
 #endif

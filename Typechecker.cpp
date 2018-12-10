@@ -59,7 +59,17 @@ class ExpTypechecker : public ExpVisitor
         const std::vector<ExpPtr>& args = exp.GetArgs();
         for( const ExpPtr& arg : args )
             Check( *arg );
+
+        // Special case: equality/inequality.
         const std::string& funcName = exp.GetFuncName();
+        if( funcName == "==" || funcName == "!=" )
+        {
+            if( args.size() != 2 || args[0]->GetType() != args[1]->GetType() )
+                throw TypeError( std::string( "Equality operator expects two arguments of the same type" ) );
+            exp.SetType( kTypeBool );
+        }
+
+        // General case: look up function definition.
         const FuncDef*     funcDef  = m_funcTable.Find( funcName );
         if( !funcDef )
             throw TypeError( std::string( "Undefined function: " ) + funcName );
@@ -229,7 +239,8 @@ class Typechecker
         }
 
         // Typecheck the function body.
-        StmtTypechecker( &scope, m_funcTable, *funcDef ).CheckStmt( funcDef->GetBody() );
+        if( funcDef->HasBody() )
+            StmtTypechecker( &scope, m_funcTable, *funcDef ).CheckStmt( funcDef->GetBody() );
     }
 };
 

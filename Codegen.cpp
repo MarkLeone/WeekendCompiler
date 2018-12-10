@@ -110,7 +110,40 @@ class CodegenExp : public ExpVisitor, CodegenBase
 
     void* Visit( CallExp& exp ) override
     {
-        // The typechecker link function call sites to their definitions.
+        // TODO: short-circuiting for special forms (&&, ||)
+        
+        // Convert the arguments to LLVM values.
+        std::vector<Value*> args;
+        args.reserve( exp.GetArgs().size() );
+        for( const ExpPtr& arg : exp.GetArgs() )
+        {
+            args.push_back( Codegen( *arg ) );
+        }
+
+        // Builtin definition?
+        const std::string& funcName = exp.GetFuncName();
+        if( funcName == "operator+" )
+            return GetBuilder()->CreateAdd( args.at( 0 ), args.at( 1 ) );
+        else if( funcName == "operator-" )
+            return GetBuilder()->CreateSub( args.at( 0 ), args.at( 1 ) );
+        else if( funcName == "operator*" )
+            return GetBuilder()->CreateMul( args.at( 0 ), args.at( 1 ) );
+        else if( funcName == "operator/" )
+            return GetBuilder()->CreateSDiv( args.at( 0 ), args.at( 1 ) );
+        else if( funcName == "operator==" )
+            return GetBuilder()->CreateICmpEQ( args.at( 0 ), args.at( 1 ) );
+        else if( funcName == "operator!=" )
+            return GetBuilder()->CreateICmpNE( args.at( 0 ), args.at( 1 ) );
+        else if( funcName == "operator<" )
+            return GetBuilder()->CreateICmpSLT( args.at( 0 ), args.at( 1 ) );
+        else if( funcName == "operator<=" )
+            return GetBuilder()->CreateICmpSLE( args.at( 0 ), args.at( 1 ) );
+        else if( funcName == "operator>" )
+            return GetBuilder()->CreateICmpSGT( args.at( 0 ), args.at( 1 ) );
+        else if( funcName == "operator>=" )
+            return GetBuilder()->CreateICmpSGE( args.at( 0 ), args.at( 1 ) );
+
+        // The typechecker linked function call sites to their definitions.
         const FuncDef* funcDef = exp.GetFuncDef();
         assert( funcDef );
 
@@ -119,16 +152,8 @@ class CodegenExp : public ExpVisitor, CodegenBase
         assert( it != m_functions->end() );
         Function* function = it->second;
 
-        // Convert the arguments to LLVM values.
-        std::vector<Value*> argValues;
-        argValues.reserve( exp.GetArgs().size() );
-        for( const ExpPtr& arg : exp.GetArgs() )
-        {
-            argValues.push_back( Codegen( *arg ) );
-        }
-
         // Generate LLVM function call.
-        return GetBuilder()->CreateCall( function, argValues, funcDef->GetName() );
+        return GetBuilder()->CreateCall( function, args, funcDef->GetName() );
     }
 
   private:
@@ -297,6 +322,10 @@ class CodegenFunc : public CodegenBase
 
     void Codegen( const FuncDef* funcDef )
     {
+        // Don't generate code for builtin function declarations.
+        if( !funcDef->HasBody() )
+            return;
+
         // Convert parameter types to LLVM types.
         const std::vector<VarDeclPtr>& params = funcDef->GetParams();
         std::vector<llvm::Type*> paramTypes;

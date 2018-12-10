@@ -39,7 +39,7 @@ enum TokenTag
     kTokenOr,
     kTokenNot,
 
-    // Punctuation
+    // Punctuation:
     kTokenLbrace,
     kTokenRbrace,
     kTokenLparen,

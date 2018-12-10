@@ -296,14 +296,18 @@ static FuncDefPtr parseFuncDef( TokenStream& tokens )
     }
     skipToken( kTokenRparen, tokens );
 
-    // Parse function body.
-    SeqStmtPtr body( parseSeq( tokens ) );
+    // Parse function body (if any);
+    SeqStmtPtr body;
+    if( *tokens == kTokenLbrace )
+        body = parseSeq( tokens );
+    else
+        skipToken( kTokenSemicolon, tokens );
 
     return std::make_unique<FuncDef>( returnType, id, std::move( params ), std::move( body ) );
 }
 
 // Prog -> FuncDef+
-ProgramPtr ParseProgram( TokenStream& tokens )
+int ParseProgram( TokenStream& tokens, Program* program )
 {
     try
     {
@@ -312,12 +316,11 @@ ProgramPtr ParseProgram( TokenStream& tokens )
             FuncDefPtr function( parseFuncDef( tokens ) );
             program->GetFunctions().push_back( std::move( function ) );
         } while( *tokens != kTokenEOF );
-
-        return std::move( program );
+        return 0;
     }
     catch( const ParseError& error )
     {
         std::cerr << "Error: " << error.what() << std::endl;
-        return ProgramPtr();
+        return -1;
     }
 }
