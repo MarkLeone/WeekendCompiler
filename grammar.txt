@@ -1,0 +1,71 @@
+Prog -> FuncDef+
+
+FuncDef -> Type Id ( VarDecl* ) Seq
+
+Type -> bool | int
+
+VarDecl -> Type Id
+
+Seq -> { Stmt* }
+
+Stmt -> Id = Exp ;
+      | Id ( Args ) ;
+      | VarDecl ;
+      | Seq
+      | return Exp ;
+      | if ( Exp ) Stmt
+      | if ( Exp ) Stmt else Stmt
+      | while ( Exp ) Stmt
+
+Args -> Exp
+      | Exp , Args
+
+----------------------------------------------------------------------
+
+Exp -> true | false
+     | Num
+     | Id
+     | Id ( Args )
+     | ( Exp )
+     | UnaryOp Exp
+     | Exp BinaryOp Exp
+
+UnaryOp  ->  -  |  +  |  !
+BinaryOp ->  *  |  /  |  %
+          |  +  |  -
+          |  <  |  <= |  >  |  >=
+          |  == |  !=
+
+----------------------------------------------------------------------
+
+PrimaryExp -> true | false
+            | Num
+            | Id
+            | Id ( Args )
+            | ( Exp )
+
+UnaryOp ->  -  |  +  |  !
+MulOp   ->  *  |  /  |  %
+AddOp   ->  +  |  -
+CmpOp   ->  <  |  <= |  >  |  >=
+EqOp    ->  == |  !=
+
+UnaryExp -> UnaryOp UnaryExp
+          | PrimaryExp
+
+MulExp -> MulExp MulOp UnaryExp
+        | UnaryExp
+
+AddExp -> AddExp AddOp MulExp
+        | MulExp
+
+CmpExp -> CmpExp CmpOp AddExp
+        | AddExp
+
+AndExp -> AndExp && CmpExp
+        | CmpExp
+
+OrExp -> OrExp || AndExp
+       | AndExp
+
+Exp -> OrExp
