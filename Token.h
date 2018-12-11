@@ -130,6 +130,8 @@ class Token
             case kTokenAnd:
             case kTokenOr:
             case kTokenNot:
+            case kTokenBool:
+            case kTokenInt:
                 return true;
             default:
                 return false;

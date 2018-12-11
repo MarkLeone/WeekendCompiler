@@ -8,6 +8,8 @@ inline const char* GetBuiltins()
            "int  operator*  ( int x, int y ); "
            "int  operator/  ( int x, int y ); "
            "int  operator%  ( int x, int y ); "
+           "bool operator== ( int x, int y ); "
+           "bool operator!= ( int x, int y ); "
            "bool operator<  ( int x, int y ); "
            "bool operator<= ( int x, int y ); "
            "bool operator>  ( int x, int y ); "
@@ -15,5 +17,9 @@ inline const char* GetBuiltins()
            "bool operator!  ( bool x ); "
            "bool operator&& ( bool x, bool y ); "
            "bool operator|| ( bool x, bool y ); "
+           "bool operator== ( bool x, bool y ); "
+           "bool operator!= ( bool x, bool y ); "
+           "bool operator bool ( int x ); "
+           "int  operator int  ( bool x ); "
         ;
 }

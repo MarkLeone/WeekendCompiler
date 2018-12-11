@@ -1,12 +1,14 @@
 #include "Typechecker.h"
 #include "Exp.h"
-#include "FuncTable.h"
+#include "FuncDef.h"
 #include "Program.h"
 #include "Scope.h"
 #include "Stmt.h"
 #include "VarDecl.h"
 #include <string>
-#include <unordered_map>
+#include <map>
+
+using FuncTable = std::multimap<std::string, const FuncDef*>;
 
 class TypeError : public std::runtime_error
 {
@@ -56,34 +58,17 @@ class ExpTypechecker : public ExpVisitor
 
     void* Visit( CallExp& exp ) override
     {
+        // Typecheck the arguments.
         const std::vector<ExpPtr>& args = exp.GetArgs();
         for( const ExpPtr& arg : args )
             Check( *arg );
 
-        // Special case: equality/inequality.
+        // Look up the function definition, which might be overloaded.
         const std::string& funcName = exp.GetFuncName();
-        if( funcName == "==" || funcName == "!=" )
-        {
-            if( args.size() != 2 || args[0]->GetType() != args[1]->GetType() )
-                throw TypeError( std::string( "Equality operator expects two arguments of the same type" ) );
-            exp.SetType( kTypeBool );
-            return nullptr;
-        }
-
-        // General case: look up function definition.
-        const FuncDef*     funcDef  = m_funcTable.Find( funcName );
+        const FuncDef* funcDef  = findFunc( funcName, args );
         if( !funcDef )
-            throw TypeError( std::string( "Undefined function: " ) + funcName );
-
-        // Check argument expression types vs. function parameter types.
-        const std::vector<VarDeclPtr>& params = funcDef->GetParams();
-        if( args.size() != params.size() )
-            throw TypeError( std::string( "Argument count mismatch in call to " + funcName ) );
-        for( size_t i = 0; i < args.size(); ++i )
-        {
-            if( args[i]->GetType() != params[i]->GetType() )
-                throw TypeError( std::string( "Argument type mismatch in call to " + funcName ) );
-        }
+            // TODO: better error message, including candidates.
+            throw TypeError( std::string( "No match for function: " ) + funcName );
 
         // Set expression type and link it to the function definition.
         exp.SetType( funcDef->GetReturnType() );
@@ -94,6 +79,31 @@ class ExpTypechecker : public ExpVisitor
   private:
     const Scope&     m_scope;
     const FuncTable& m_funcTable;
+
+    // TODO: generalize this and use it to check for duplicate definitions.
+    const FuncDef* findFunc( std::string name, const std::vector<ExpPtr>& args ) const
+    {
+        auto range = m_funcTable.equal_range( name );
+        for( auto it = range.first; it != range.second; ++it )
+        {
+            const FuncDef* funcDef = it->second;
+            if (argsMatch(funcDef->GetParams(), args))
+                return funcDef;
+        }
+        return nullptr;
+    }
+
+    static bool argsMatch( const std::vector<VarDeclPtr>& params, const std::vector<ExpPtr>& args )
+    {
+        if( params.size() != args.size() )
+            return false;
+        for( size_t i = 0; i < params.size(); ++i )
+        {
+            if( params[i]->GetType() != args[i]->GetType() )
+                return false;
+        }
+        return true;
+    }
 };
 
 class StmtTypechecker : public StmtVisitor
@@ -199,11 +209,6 @@ class StmtTypechecker : public StmtVisitor
 class Typechecker
 {
   public:
-    Typechecker()
-    {
-        // TODO: load builtin function definitions.
-    }
-
     int Check( Program& program )
     {
         for( const FuncDefPtr& funcDef : program.GetFunctions() )
@@ -227,9 +232,8 @@ class Typechecker
     void checkFunction( FuncDef* funcDef )
     {
         // To permit recursion, we add the definition to the function table
-        // before typechecking the body.
-        if( !m_funcTable.Insert( funcDef ) )
-            throw TypeError( std::string( "Function already defined: " ) + funcDef->GetName() );
+        // before typechecking the body.  TODO: check for duplicate definitions.
+        m_funcTable.insert( FuncTable::value_type( funcDef->GetName(), funcDef ) );
 
         // Construct a scope and add the function parameters.
         Scope scope;

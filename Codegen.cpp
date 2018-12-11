@@ -110,8 +110,6 @@ class CodegenExp : public ExpVisitor, CodegenBase
 
     void* Visit( CallExp& exp ) override
     {
-        // TODO: short-circuiting for special forms (&&, ||)
-        
         // Convert the arguments to LLVM values.
         std::vector<Value*> args;
         args.reserve( exp.GetArgs().size() );
@@ -144,6 +142,12 @@ class CodegenExp : public ExpVisitor, CodegenBase
             return GetBuilder()->CreateICmpSGT( args.at( 0 ), args.at( 1 ) );
         else if( funcName == ">=" )
             return GetBuilder()->CreateICmpSGE( args.at( 0 ), args.at( 1 ) );
+        else if( funcName == "!" )
+            return GetBuilder()->CreateICmpEQ( args.at( 0 ), GetBool( false ) );
+        else if( funcName == "bool" )
+            return GetBuilder()->CreateICmpNE( args.at( 0 ), GetInt( 0 ) );
+        else if( funcName == "int" )
+            return GetBuilder()->CreateZExt( args.at( 0 ), GetIntType() );
 
         // The typechecker linked function call sites to their definitions.
         const FuncDef* funcDef = exp.GetFuncDef();
