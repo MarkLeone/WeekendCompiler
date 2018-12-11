@@ -5,6 +5,9 @@
 #include "Stmt.h"
 #include "TokenStream.h"
 
+// Exceptions are used internally by the parser to simplify error checking.
+// Any parse error is caught by the top-level parsing routine, which reports
+// an error and returns an error status.
 class ParseError : public std::runtime_error
 {
   public:
@@ -327,7 +330,8 @@ static FuncDefPtr parseFuncDef( TokenStream& tokens )
     return std::make_unique<FuncDef>( returnType, id, std::move( params ), std::move( body ) );
 }
 
-// Prog -> FuncDef+
+// Parse the given tokens, adding function definitions to the given program.
+// Returns zero for success (otherwise an error message is reported).
 int ParseProgram( TokenStream& tokens, Program* program )
 {
     try

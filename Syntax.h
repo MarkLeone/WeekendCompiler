@@ -2,6 +2,8 @@
 
 #include <memory>
 
+// Forward declarations for syntax classes
+
 class Exp;
 class BoolExp;
 class IntExp;

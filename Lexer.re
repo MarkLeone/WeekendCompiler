@@ -1,6 +1,13 @@
 #include "Lexer.h"
 #include <iostream>
 
+// This file is processed by re2c (http://re2c.org) to generate a finite state
+// machine that matches various regular expressions.
+
+// Scan the given string for the next token (discarding whitespace).
+// The string pointer is passed by reference; it is advanced to the character
+// following the token.  Discards invalid characters (with a warning).
+// Returns kTokenEOF if the string contains no token.
 Token Lexer(const char*& source)
 {
  start:
@@ -12,7 +19,7 @@ Token Lexer(const char*& source)
 
         integer     = "-"?[0-9]+;
         id          = [a-zA-Z_][a-zA-Z_0-9]*;
-        space       = [ \t\r\n]*;
+        space       = [ \t\r\n]+;
         eof         = "\x00";
 
         integer    { return Token( atoi( begin ) ); }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Fwd.h"
+#include "Syntax.h"
 
 class ExpVisitor
 {

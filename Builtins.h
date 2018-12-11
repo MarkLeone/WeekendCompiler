@@ -1,5 +1,6 @@
 #pragma once
 
+// Get builtin function declarations (for typechecking purposes).
 inline const char* GetBuiltins()
 {
     return

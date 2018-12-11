@@ -1,15 +1,18 @@
 #pragma once
 
-#include "Fwd.h"
 #include "Stmt.h"
+#include "Syntax.h"
 #include "Type.h"
+
 #include <memory>
 #include <string>
 #include <vector>
 
+/// Syntax for function definition.
 class FuncDef
 {
   public:
+    /// Construct function definition syntax.
     FuncDef( const Type& returnType, const std::string& name, std::vector<VarDeclPtr>&& params, SeqStmtPtr body )
         : m_returnType( returnType )
         , m_name( name )
@@ -18,14 +21,19 @@ class FuncDef
     {
     }
 
+    /// Get the function return type.
     const Type& GetReturnType() const { return m_returnType; }
 
+    /// Get the function name.
     const std::string& GetName() const { return m_name; }
 
+    /// Get the parameter declarations.
     const std::vector<VarDeclPtr>& GetParams() const { return m_params; }
 
+    /// Check whether the function definition has a body.  (Builtin function declarations do not.)
     bool HasBody() const { return bool( m_body ); }
 
+    /// Get the function body, which is a sequence of statements.
     const SeqStmt& GetBody() const
     {
         assert( HasBody() && "Expected function body" );
@@ -39,5 +47,6 @@ class FuncDef
     SeqStmtPtr              m_body;
 };
 
+/// Unique pointer to a function definition.
 using FuncDefPtr = std::unique_ptr<FuncDef>;
 
