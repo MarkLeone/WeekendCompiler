@@ -95,6 +95,15 @@ class CallExp : public Exp
     {
     }
 
+    CallExp( const std::string& funcName, ExpPtr leftExp, ExpPtr rightExp )
+        : m_funcName( funcName )
+        , m_args( 2 )
+        , m_funcDef( nullptr )
+    {
+        m_args[0] = std::move( leftExp );
+        m_args[1] = std::move( rightExp ); 
+    }
+
     const std::string& GetFuncName() const { return m_funcName; }
 
     const std::vector<ExpPtr>& GetArgs() const { return m_args; }

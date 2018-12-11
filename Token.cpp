@@ -20,12 +20,26 @@ std::string Token::ToString() const
         case kTokenElse:      return "else";
         case kTokenReturn:    return "return";
         case kTokenWhile:     return "while";
+        case kTokenPlus:      return "+";
+        case kTokenMinus:     return "-";
+        case kTokenTimes:     return "*";
+        case kTokenDiv:       return "/";
+        case kTokenMod:       return "%";
+        case kTokenEQ:        return "==";
+        case kTokenNE:        return "!=";
+        case kTokenLT:        return "<";
+        case kTokenLE:        return "<=";
+        case kTokenGT:        return ">";
+        case kTokenGE:        return ">=";
+        case kTokenAnd:       return "&&";
+        case kTokenOr:        return "||";
+        case kTokenNot:       return "!";
         case kTokenLbrace:    return "{";
         case kTokenRbrace:    return "}";
         case kTokenLparen:    return "(";
         case kTokenRparen:    return ")";
         case kTokenComma:     return ",";
-        case kTokenEq:        return "=";
+        case kTokenAssign:    return "=";
         case kTokenSemicolon: return ";";
         case kTokenEOF:       return "<EOF>";
     }

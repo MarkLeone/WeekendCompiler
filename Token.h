@@ -23,13 +23,29 @@ enum TokenTag
     kTokenReturn,
     kTokenWhile,
 
+    // Operators:
+    kTokenPlus,
+    kTokenMinus,
+    kTokenTimes,
+    kTokenDiv,
+    kTokenMod,
+    kTokenEQ,
+    kTokenNE,
+    kTokenLT,
+    kTokenLE,
+    kTokenGT,
+    kTokenGE,
+    kTokenAnd,
+    kTokenOr,
+    kTokenNot,
+
     // Punctuation
     kTokenLbrace,
     kTokenRbrace,
     kTokenLparen,
     kTokenRparen,
     kTokenComma,
-    kTokenEq,
+    kTokenAssign,
     kTokenSemicolon,
     kTokenEOF
 };

@@ -15,9 +15,11 @@ class ParseError : public std::runtime_error
 };
 
 // Forward declarations
+static ExpPtr parseExp( TokenStream& tokens );
 static std::vector<ExpPtr> parseArgs( TokenStream& tokens );
-static SeqStmtPtr parseSeqStmt( TokenStream& tokens );
+static SeqStmtPtr parseSeq( TokenStream& tokens );
 
+// Skip the specified token, throwing ParseError if it's not present.
 static void skipToken( const Token& expected, TokenStream& tokens )
 {
     Token token( *tokens++ );
@@ -25,26 +27,105 @@ static void skipToken( const Token& expected, TokenStream& tokens )
         throw ParseError( std::string( "Expected '" ) + expected.ToString() + "'" );
 }
 
-static ExpPtr parseExp( TokenStream& tokens )
+// PrimaryExp -> true | false
+//             | Num
+//             | Id
+//             | Id ( Args )
+//             | ( Exp )
+static ExpPtr parsePrimaryExp( TokenStream& tokens )
 {
     Token token( *tokens++ );
     switch( token.GetTag() )
     {
-        case kTokenTrue:  return ExpPtr( new BoolExp( true ) );
-        case kTokenFalse: return ExpPtr( new BoolExp( false ) );
-        case kTokenNum:   return ExpPtr( new IntExp( token.GetNum() ) );
+        case kTokenTrue:
+            return std::make_unique<BoolExp>( true );
+        case kTokenFalse:
+            return std::make_unique<BoolExp>( false );
+        case kTokenNum:
+            return std::make_unique<IntExp>( token.GetNum() );
         case kTokenId:
         {
             if( *tokens == kTokenLparen )
-                return ExpPtr( new CallExp( token.GetId(), parseArgs( tokens ) ) );
+                return std::make_unique<CallExp>( token.GetId(), parseArgs( tokens ) );
             else
-                return ExpPtr( new VarExp( token.GetId() ) );
+                return std::make_unique<VarExp>( token.GetId() );
+        }
+        case kTokenLparen:
+        {
+            skipToken( kTokenLparen, tokens );
+            ExpPtr exp( parseExp( tokens ) );
+            skipToken( kTokenRparen, tokens );
+            return exp;
         }
         default:
             throw ParseError( std::string( "Unexpected token: " ) + token.ToString() );
     }
 }
 
+static int getPrecedence( const Token& token )
+{
+    switch( token.GetTag() )
+    {
+        case kTokenTimes:
+        case kTokenDiv:
+            return 5;
+        case kTokenMod:
+        case kTokenPlus:
+        case kTokenMinus:
+            return 4;
+        case kTokenLT:
+        case kTokenLE:
+        case kTokenGT:
+        case kTokenGE:
+            return 3;
+        case kTokenEQ:
+        case kTokenNE:
+            return 2;
+        case kTokenAnd:
+            return 1;
+        case kTokenOr:
+            return 0;
+        default:
+            return -1;
+    }
+}
+
+static ExpPtr parseRemainingExp( ExpPtr leftExp, int leftPrecedence, TokenStream& tokens )
+{
+    while( true )
+    {
+        // If the previous operator has higher precedence than the current one,
+        // it claims the prevously parsed expression.
+        int precedence = getPrecedence( *tokens );
+        if( leftPrecedence > precedence )
+            return leftExp;
+
+        // Parse the current operator and the current primary expression.
+        Token opToken( *tokens++ );
+        ExpPtr rightExp = parsePrimaryExp( tokens );
+
+        // If the next operator has higher precedence, it claims the current expression.
+        int rightPrecedence = getPrecedence( *tokens );
+        if( rightPrecedence > precedence )
+        {
+            rightExp = parseRemainingExp( std::move( rightExp ), precedence + 1, tokens );
+        }
+
+        // Construct a call expression with the left and right expressions.
+        leftExp = std::make_unique<CallExp>( opToken.ToString(),
+                                             std::move( leftExp ), std::move( rightExp ) );
+    }
+}
+
+static ExpPtr parseExp( TokenStream& tokens )
+{
+    ExpPtr leftExp( parsePrimaryExp( tokens ) );
+    return parseRemainingExp( std::move( leftExp ), 0 /*initial precedence*/, tokens );
+}
+
+// Args    -> ( ArgList )
+// ArgList -> Exp
+//          | Exp , ArgList
 static std::vector<ExpPtr> parseArgs( TokenStream& tokens )
 {
     skipToken( kTokenLparen, tokens );
@@ -62,6 +143,7 @@ static std::vector<ExpPtr> parseArgs( TokenStream& tokens )
     return std::move( exps );
 }
 
+// Type -> bool | int
 static Type parseType( TokenStream& tokens )
 {
     Token typeName( *tokens++ );
@@ -84,13 +166,22 @@ static std::string parseId( TokenStream& tokens )
     return id.GetId();
 }
 
+// VarDecl -> Type Id
 static VarDeclPtr parseVarDecl( VarDecl::Kind kind, TokenStream& tokens )
 {
     Type        type( parseType( tokens ) );
     std::string id( parseId( tokens ) );
-    return VarDeclPtr( new VarDecl( kind, type, id ) );
+    return std::make_unique<VarDecl>( kind, type, id );
 }
 
+// Stmt -> Id = Exp ;
+//       | Id ( Args ) ;
+//       | VarDecl ;
+//       | Seq
+//       | return Exp ;
+//       | if ( Exp ) Stmt
+//       | if ( Exp ) Stmt else Stmt
+//       | while ( Exp ) Stmt
 static StmtPtr parseStmt( TokenStream& tokens )
 {
     Token token( *tokens );
@@ -99,20 +190,20 @@ static StmtPtr parseStmt( TokenStream& tokens )
         case kTokenId:
         {
             Token id( *tokens++ );
-            if( *tokens == kTokenEq )
+            if( *tokens == kTokenAssign )
             {
                 // Assignment
                 ExpPtr rvalue( parseExp( ++tokens ) );
                 skipToken( kTokenSemicolon, tokens );
-                return StmtPtr( new AssignStmt( id.GetId(), std::move( rvalue ) ) );
+                return std::make_unique<AssignStmt>( id.GetId(), std::move( rvalue ) );
             }
             else
             {
                 // Call
                 std::vector<ExpPtr> args( parseArgs( tokens ) );
-                CallExpPtr          callExp( new CallExp( id.GetId(), std::move( args ) ) );
+                CallExpPtr          callExp( std::make_unique<CallExp>( id.GetId(), std::move( args ) ) );
                 skipToken( kTokenSemicolon, tokens );
-                return StmtPtr( new CallStmt( std::move( callExp ) ) );
+                return std::make_unique<CallStmt>( std::move( callExp ) );
             }
         }
         case kTokenInt:
@@ -121,24 +212,24 @@ static StmtPtr parseStmt( TokenStream& tokens )
             // Declaration
             VarDeclPtr varDecl( parseVarDecl( VarDecl::kLocal, tokens ) );
             ExpPtr     initExp;
-            if( *tokens == kTokenEq )
+            if( *tokens == kTokenAssign )
             {
                 initExp = parseExp( ++tokens );
             }
             skipToken( kTokenSemicolon, tokens );
-            return StmtPtr( new DeclStmt( std::move( varDecl ), std::move( initExp ) ) );
+            return std::make_unique<DeclStmt>( std::move( varDecl ), std::move( initExp ) );
         }
         case kTokenLbrace:
         {
             // Sequence
-            return parseSeqStmt( tokens );
+            return parseSeq( tokens );
         }
         case kTokenReturn:
         {
             ++tokens;  // skip "return"
             ExpPtr returnExp( parseExp( tokens ) );
             skipToken( kTokenSemicolon, tokens );
-            return StmtPtr( new ReturnStmt( std::move( returnExp ) ) );
+            return std::make_unique<ReturnStmt>( std::move( returnExp ) );
         }
         case kTokenIf:
         {
@@ -154,7 +245,7 @@ static StmtPtr parseStmt( TokenStream& tokens )
                 ++tokens;  // skip "else"
                 elseStmt = parseStmt( tokens );
             }
-            return StmtPtr( new IfStmt( std::move( condExp ), std::move( thenStmt ), std::move( elseStmt ) ) );
+            return std::make_unique<IfStmt>( std::move( condExp ), std::move( thenStmt ), std::move( elseStmt ) );
         }
         case kTokenWhile:
         {
@@ -164,14 +255,15 @@ static StmtPtr parseStmt( TokenStream& tokens )
             skipToken( kTokenRparen, tokens );
 
             StmtPtr bodyStmt( parseStmt( tokens ) );
-            return StmtPtr( new WhileStmt( std::move( condExp ), std::move( bodyStmt ) ) );
+            return std::make_unique<WhileStmt>( std::move( condExp ), std::move( bodyStmt ) );
         }
         default:
             throw ParseError( std::string( "Unexpected token: " ) + token.ToString() );
     }
 }
 
-static SeqStmtPtr parseSeqStmt( TokenStream& tokens )
+// Seq -> { Stmt* }
+static SeqStmtPtr parseSeq( TokenStream& tokens )
 {
     skipToken( kTokenLbrace, tokens );
     std::vector<StmtPtr> stmts;
@@ -180,9 +272,10 @@ static SeqStmtPtr parseSeqStmt( TokenStream& tokens )
         stmts.push_back( parseStmt( tokens ) );
     }
     skipToken( kTokenRbrace, tokens );
-    return SeqStmtPtr( new SeqStmt( std::move( stmts ) ) );
+    return std::make_unique<SeqStmt>( std::move( stmts ) );
 }
 
+// FuncDef -> Type Id ( VarDecl* ) Seq
 static FuncDefPtr parseFuncDef( TokenStream& tokens )
 {
     // Parse return type and function id.
@@ -204,21 +297,22 @@ static FuncDefPtr parseFuncDef( TokenStream& tokens )
     skipToken( kTokenRparen, tokens );
 
     // Parse function body.
-    SeqStmtPtr body( parseSeqStmt( tokens ) );
+    SeqStmtPtr body( parseSeq( tokens ) );
 
-    return FuncDefPtr( new FuncDef( returnType, id, std::move( params ), std::move( body ) ) );
+    return std::make_unique<FuncDef>( returnType, id, std::move( params ), std::move( body ) );
 }
 
+// Prog -> FuncDef+
 ProgramPtr ParseProgram( TokenStream& tokens )
 {
     try
     {
-        ProgramPtr program( new Program );
-        while( *tokens != kTokenEOF )
-        {
+        ProgramPtr program( std::make_unique<Program>() );
+        do {
             FuncDefPtr function( parseFuncDef( tokens ) );
             program->GetFunctions().push_back( std::move( function ) );
-        }
+        } while( *tokens != kTokenEOF );
+
         return std::move( program );
     }
     catch( const ParseError& error )
