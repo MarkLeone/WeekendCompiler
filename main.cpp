@@ -8,9 +8,11 @@
 #include "TokenStream.h"
 #include "Typechecker.h"
 
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/PassManager.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
-#include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 
 #include <iostream>
@@ -49,16 +51,21 @@ int main( int argc, const char* const* argv )
     std::unique_ptr<llvm::Module> module( Codegen( &context, *program ) );
     // llvm::outs() << *module;
 
-    // Construct the JIT engine.
-    InitializeNativeTarget();
-    InitializeNativeTargetAsmPrinter();
-    InitializeNativeTargetAsmParser();
+    // Construct JIT engine and use data layout for target-specific optimizations.
     SimpleJIT jit;
+    module->setDataLayout( jit.getTargetMachine().createDataLayout() );
 
-    // Optimize the module.  Using the data layout from the JIT engine allows
-    // target-specific optimizations.
-    module->setDataLayout(jit.getTargetMachine().createDataLayout());
-    
+    // Optimize the module.
+    legacy::FunctionPassManager functionPasses( module.get() );
+    legacy::PassManager         modulePasses;
+    PassManagerBuilder          builder;
+    builder.OptLevel = 2;
+    builder.populateFunctionPassManager( functionPasses );
+    builder.populateModulePassManager( modulePasses );
+    for( Function& function : *module )
+        functionPasses.run( function );
+    modulePasses.run( *module );
+
     // Use the JIT engine to generate native code.
     VModuleKey key = jit.addModule( std::move(module) );
 

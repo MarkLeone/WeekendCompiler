@@ -1,15 +1,17 @@
 #pragma once
 
-#include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/ExecutionEngine/JITSymbol.h"
-#include "llvm/ExecutionEngine/Orc/CompileUtils.h"
-#include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
-#include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
-#include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
-#include "llvm/ExecutionEngine/SectionMemoryManager.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Target/TargetMachine.h"
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/JITSymbol.h>
+#include <llvm/ExecutionEngine/Orc/CompileUtils.h>
+#include <llvm/ExecutionEngine/Orc/IRCompileLayer.h>
+#include <llvm/ExecutionEngine/Orc/LambdaResolver.h>
+#include <llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h>
+#include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#include <llvm/IR/DataLayout.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/Target/TargetMachine.h>
+
 #include <memory>
 #include <string>
 
@@ -19,9 +21,10 @@ using namespace llvm::orc;
 // Adapted from LLVM example (KaleidoscopeJIT)
 class SimpleJIT {
 public:
-    SimpleJIT()
-        : m_resolver
-          (createLegacyLookupResolver
+    SimpleJIT() :
+        m_initialized( init() ),
+        m_resolver
+        (createLegacyLookupResolver
            ( m_session,
              [this](const std::string& name) {
                  return m_objectLayer.findSymbol(name, true);
@@ -35,7 +38,7 @@ public:
                       }),
           m_compileLayer(m_objectLayer, SimpleCompiler(*m_target))
     {
-        llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
+        llvm::sys::DynamicLibrary::LoadLibraryPermanently( nullptr );
     }
 
     TargetMachine& getTargetMachine() { return *m_target; }
@@ -61,10 +64,20 @@ private:
     using ObjLayerT     = RTDyldObjectLinkingLayer;
     using CompileLayerT = IRCompileLayer<ObjLayerT, SimpleCompiler>;
 
+    bool                            m_initialized;
     ExecutionSession                m_session;
     std::shared_ptr<SymbolResolver> m_resolver;
     std::unique_ptr<TargetMachine>  m_target;
     const DataLayout                m_dataLayout;
     ObjLayerT                       m_objectLayer;
     CompileLayerT                   m_compileLayer;
+
+    bool init()
+    {
+        InitializeNativeTarget();
+        InitializeNativeTargetAsmPrinter();
+        InitializeNativeTargetAsmParser();
+        return true;
+    }
+    
 };
