@@ -6,6 +6,7 @@ inline const char* GetBuiltins()
            "int  operator-  ( int x, int y ); "
            "int  operator*  ( int x, int y ); "
            "int  operator/  ( int x, int y ); "
+           "int  operator%  ( int x, int y ); "
            "bool operator<  ( int x, int y ); "
            "bool operator<= ( int x, int y ); "
            "bool operator>  ( int x, int y ); "

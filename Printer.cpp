@@ -128,7 +128,9 @@ std::ostream& operator<<( std::ostream& out, const FuncDef& def )
             out << ", ";
         out << *def.GetParams()[i];
     }
-    out << ')' << std::endl << def.GetBody();  // TODO: force braces around body.
+    out << ')' << std::endl;
+    if( def.HasBody() )
+        out << def.GetBody();
     return out;
 }
 
@@ -136,7 +138,8 @@ std::ostream& operator<<( std::ostream& out, const Program& program )
 {
     for( const FuncDefPtr& funcDef : program.GetFunctions() )
     {
-        std::cout << *funcDef << std::endl;
+        if( funcDef->HasBody() )
+            out << *funcDef << std::endl;
     }
     return out;
 }

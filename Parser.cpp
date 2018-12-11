@@ -311,7 +311,6 @@ int ParseProgram( TokenStream& tokens, Program* program )
 {
     try
     {
-        ProgramPtr program( std::make_unique<Program>() );
         do {
             FuncDefPtr function( parseFuncDef( tokens ) );
             program->GetFunctions().push_back( std::move( function ) );

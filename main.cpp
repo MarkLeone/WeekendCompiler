@@ -32,10 +32,11 @@ void dumpIR( llvm::Module& module, const char* srcFilename, const char* what )
 {
     if ( !getenv("ENABLE_DUMP") )
         return;
-    std::string   filename( std::string( srcFilename ) + what + ".ll" );
+    std::string   filename( std::string( srcFilename ) + "." + what + ".ll" );
     std::ofstream stream( filename );
     llvm::raw_os_ostream out( stream );
     out << module;
+}
 
 // Read file into the given buffer.  Returns zero for success.
 int readFile( const char* filename, std::vector<char>* buffer )

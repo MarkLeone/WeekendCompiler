@@ -16,7 +16,7 @@ Token Lexer(const char*& source)
         id          = [a-zA-Z_][a-zA-Z_0-9]*;
         space       = [ \t\r\n]*;
         eof         = "\x00";
-        op          = "+" | "-" | "*" | "/" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "&&" | "||" | "!";
+        op          = "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "&&" | "||" | "!";
 
         integer  { return Token( atoi( begin ) ); }
         "bool"   { return kTokenBool; }

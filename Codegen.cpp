@@ -130,6 +130,8 @@ class CodegenExp : public ExpVisitor, CodegenBase
             return GetBuilder()->CreateMul( args.at( 0 ), args.at( 1 ) );
         else if( funcName == "operator/" )
             return GetBuilder()->CreateSDiv( args.at( 0 ), args.at( 1 ) );
+        else if( funcName == "operator%" )
+            return GetBuilder()->CreateSRem( args.at( 0 ), args.at( 1 ) );
         else if( funcName == "operator==" )
             return GetBuilder()->CreateICmpEQ( args.at( 0 ), args.at( 1 ) );
         else if( funcName == "operator!=" )
