@@ -20,6 +20,7 @@ std::string Token::ToString() const
         case kTokenElse:      return "else";
         case kTokenReturn:    return "return";
         case kTokenWhile:     return "while";
+        case kTokenOperator:  return "operator";
         case kTokenPlus:      return "+";
         case kTokenMinus:     return "-";
         case kTokenTimes:     return "*";

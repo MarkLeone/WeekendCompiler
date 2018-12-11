@@ -22,6 +22,7 @@ enum TokenTag
     kTokenElse,
     kTokenReturn,
     kTokenWhile,
+    kTokenOperator,
 
     // Operators:
     kTokenPlus,
@@ -93,6 +94,7 @@ class Token
         return m_id;
     }
 
+    /// Get token text, e.g. operator name.
     std::string ToString() const;
 
     /// Equality considers token value for numeric and identifier tokens.
@@ -108,6 +110,31 @@ class Token
     }
 
     bool operator!=( const Token& other ) { return !( *this == other ); }
+
+
+    bool IsOperator() const
+    {
+        switch( GetTag() )
+        {
+            case kTokenPlus:
+            case kTokenMinus:
+            case kTokenTimes:
+            case kTokenDiv:
+            case kTokenMod:
+            case kTokenEQ:
+            case kTokenNE:
+            case kTokenLT:
+            case kTokenLE:
+            case kTokenGT:
+            case kTokenGE:
+            case kTokenAnd:
+            case kTokenOr:
+            case kTokenNot:
+                return true;
+            default:
+                return false;
+        }
+    }
 
   private:
     TokenTag    m_tag;  // Tag of token, e.g. int, id, keyword.

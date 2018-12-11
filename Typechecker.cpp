@@ -67,6 +67,7 @@ class ExpTypechecker : public ExpVisitor
             if( args.size() != 2 || args[0]->GetType() != args[1]->GetType() )
                 throw TypeError( std::string( "Equality operator expects two arguments of the same type" ) );
             exp.SetType( kTypeBool );
+            return nullptr;
         }
 
         // General case: look up function definition.

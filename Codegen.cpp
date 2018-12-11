@@ -122,27 +122,27 @@ class CodegenExp : public ExpVisitor, CodegenBase
 
         // Builtin definition?
         const std::string& funcName = exp.GetFuncName();
-        if( funcName == "operator+" )
+        if( funcName == "+" )
             return GetBuilder()->CreateAdd( args.at( 0 ), args.at( 1 ) );
-        else if( funcName == "operator-" )
+        else if( funcName == "-" )
             return GetBuilder()->CreateSub( args.at( 0 ), args.at( 1 ) );
-        else if( funcName == "operator*" )
+        else if( funcName == "*" )
             return GetBuilder()->CreateMul( args.at( 0 ), args.at( 1 ) );
-        else if( funcName == "operator/" )
+        else if( funcName == "/" )
             return GetBuilder()->CreateSDiv( args.at( 0 ), args.at( 1 ) );
-        else if( funcName == "operator%" )
+        else if( funcName == "%" )
             return GetBuilder()->CreateSRem( args.at( 0 ), args.at( 1 ) );
-        else if( funcName == "operator==" )
+        else if( funcName == "==" )
             return GetBuilder()->CreateICmpEQ( args.at( 0 ), args.at( 1 ) );
-        else if( funcName == "operator!=" )
+        else if( funcName == "!=" )
             return GetBuilder()->CreateICmpNE( args.at( 0 ), args.at( 1 ) );
-        else if( funcName == "operator<" )
+        else if( funcName == "<" )
             return GetBuilder()->CreateICmpSLT( args.at( 0 ), args.at( 1 ) );
-        else if( funcName == "operator<=" )
+        else if( funcName == "<=" )
             return GetBuilder()->CreateICmpSLE( args.at( 0 ), args.at( 1 ) );
-        else if( funcName == "operator>" )
+        else if( funcName == ">" )
             return GetBuilder()->CreateICmpSGT( args.at( 0 ), args.at( 1 ) );
-        else if( funcName == "operator>=" )
+        else if( funcName == ">=" )
             return GetBuilder()->CreateICmpSGE( args.at( 0 ), args.at( 1 ) );
 
         // The typechecker linked function call sites to their definitions.
@@ -251,17 +251,25 @@ class CodegenStmt : public StmtVisitor, CodegenBase
         // Create a conditional branch.
         GetBuilder()->CreateCondBr( condition, thenBlock, elseBlock ? elseBlock : joinBlock );
 
-        // Generate code for "then" branch, followed by an unconditional branch to the join block.
+        // Generate code for "then" branch
         GetBuilder()->SetInsertPoint( thenBlock );
         Codegen( stmt.GetThenStmt() );
-        GetBuilder()->CreateBr( joinBlock );
+
+        // Create an unconditional branch to the "join" block, unless the block already ends
+        // in a return instruction.
+        if( !GetBuilder()->GetInsertBlock()->getTerminator() )
+            GetBuilder()->CreateBr( joinBlock );
 
         // If present, generate code for "else" branch.
         if( stmt.HasElseStmt() )
         {
             GetBuilder()->SetInsertPoint( elseBlock );
             Codegen( stmt.GetElseStmt() );
-            GetBuilder()->CreateBr( joinBlock );
+
+            // Create an unconditional branch to the "join" block, unless the block already ends
+            // in a return instruction.
+            if( !GetBuilder()->GetInsertBlock()->getTerminator() )
+                GetBuilder()->CreateBr( joinBlock );
         }
 
         // Set the builder insertion point in the join block.
@@ -362,8 +370,9 @@ class CodegenFunc : public CodegenBase
         CodegenStmt codegen( GetContext(), GetModule(), GetBuilder(), &symbols, m_functions, function );
         codegen.Codegen( funcDef->GetBody() );
 
-        // Note: it's the user's responsiblity to ensure that the function ends with a return statement.
-        // TODO: verify this in the typechecker?
+        // Add a return instruction if the user neglected to do so.
+        if( !GetBuilder()->GetInsertBlock()->getTerminator() )
+            GetBuilder()->CreateRet( GetInt( 0 ) );
     }
 
   private:
@@ -378,7 +387,7 @@ std::unique_ptr<Module> Codegen(LLVMContext* context, const Program& program)
     for( const FuncDefPtr& funcDef : program.GetFunctions() )
     {
         CodegenFunc( context, module.get(), &functions ).Codegen( funcDef.get() );
-    } 
+    }
     assert(!verifyModule(*module, &llvm::errs()));
     return std::move( module );
 }

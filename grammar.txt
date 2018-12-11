@@ -1,8 +1,10 @@
 Prog -> FuncDef+
 
-FuncDef -> Type Id ( VarDecl* ) Seq
+FuncDef -> Type FuncId ( VarDecl* ) Seq
 
 Type -> bool | int
+
+FuncId -> Id | operator BinaryOp
 
 VarDecl -> Type Id
 
@@ -30,7 +32,7 @@ Exp -> true | false
      | UnaryOp Exp
      | Exp BinaryOp Exp
 
-UnaryOp  ->  -  |  +  |  !
+UnaryOp  ->  -  |  !
 BinaryOp ->  *  |  /  |  %
           |  +  |  -
           |  <  |  <= |  >  |  >=

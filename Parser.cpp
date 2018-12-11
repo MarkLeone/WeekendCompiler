@@ -32,6 +32,7 @@ static void skipToken( const Token& expected, TokenStream& tokens )
 //             | Id
 //             | Id ( Args )
 //             | ( Exp )
+//             | UnaryOp PrimaryExp
 static ExpPtr parsePrimaryExp( TokenStream& tokens )
 {
     Token token( *tokens++ );
@@ -56,6 +57,12 @@ static ExpPtr parsePrimaryExp( TokenStream& tokens )
             ExpPtr exp( parseExp( tokens ) );
             skipToken( kTokenRparen, tokens );
             return exp;
+        }
+        case kTokenMinus:
+        {
+            Token unaryOp( *tokens++ );
+            ExpPtr exp( parsePrimaryExp( tokens ) );
+            return std::make_unique<CallExp>( unaryOp.ToString(), std::move( exp ) );
         }
         default:
             throw ParseError( std::string( "Unexpected token: " ) + token.ToString() );
@@ -275,12 +282,26 @@ static SeqStmtPtr parseSeq( TokenStream& tokens )
     return std::make_unique<SeqStmt>( std::move( stmts ) );
 }
 
+static std::string parseFuncId( TokenStream& tokens )
+{
+    if( *tokens == kTokenOperator )
+    {
+        ++tokens;
+        Token op( *tokens++ );
+        if( !op.IsOperator() )
+            throw ParseError( "Invalid operator" );
+        return op.ToString();
+    }
+    else
+        return parseId( tokens );
+}
+
 // FuncDef -> Type Id ( VarDecl* ) Seq
 static FuncDefPtr parseFuncDef( TokenStream& tokens )
 {
     // Parse return type and function id.
     Type        returnType( parseType( tokens ) );
-    std::string id( parseId( tokens ) );
+    std::string id( parseFuncId( tokens ) );
 
     // Parse parameter declarations
     skipToken( kTokenLparen, tokens );
