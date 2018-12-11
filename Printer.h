@@ -1,5 +1,4 @@
-#ifndef PRINTER_H
-#define PRINTER_H
+#pragma once
 
 #include <iosfwd>
 
@@ -13,4 +12,4 @@ std::ostream& operator<<( std::ostream& out, const Stmt& stmt );
 std::ostream& operator<<( std::ostream& out, const FuncDef& def );
 std::ostream& operator<<( std::ostream& out, const Program& program );
 
-#endif
+

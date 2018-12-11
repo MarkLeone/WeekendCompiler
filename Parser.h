@@ -1,5 +1,4 @@
-#ifndef PARSER_H
-#define PARSER_H
+#pragma once
 
 #include "Fwd.h"
 
@@ -8,4 +7,4 @@ class TokenStream;
 
 int ParseProgram( TokenStream& tokens, Program* program );
 
-#endif
+

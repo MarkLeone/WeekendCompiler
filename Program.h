@@ -1,5 +1,4 @@
-#ifndef PROGRAM_H
-#define PROGRAM_H
+#pragma once
 
 #include <memory>
 
@@ -19,4 +18,4 @@ class Program
 
 using ProgramPtr = std::unique_ptr<Program>;
 
-#endif
+

@@ -1,5 +1,4 @@
-#ifndef STMT_H
-#define STMT_H
+#pragma once
 
 #include "Exp.h"
 #include "VarDecl.h"
@@ -167,4 +166,4 @@ class WhileStmt : public Stmt
     StmtPtr m_bodyStmt;
 };
 
-#endif
+

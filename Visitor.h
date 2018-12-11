@@ -1,5 +1,4 @@
-#ifndef VISITOR_H
-#define VISITOR_H
+#pragma once
 
 #include "Fwd.h"
 
@@ -24,4 +23,4 @@ class StmtVisitor
     virtual void Visit( WhileStmt& exp )  = 0;
 };
 
-#endif
+

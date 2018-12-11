@@ -1,5 +1,4 @@
-#ifndef EXP_H
-#define EXP_H
+#pragma once
 
 #include "Type.h"
 #include "Visitor.h"
@@ -130,4 +129,3 @@ class CallExp : public Exp
 
 using CallExpPtr = std::unique_ptr<CallExp>;
 
-#endif

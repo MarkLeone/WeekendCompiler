@@ -1,8 +1,7 @@
-#ifndef LEXER_H
-#define LEXER_H
+#pragma once
 
 #include "Token.h"
 
 Token Lexer( const char*& source );
 
-#endif
+

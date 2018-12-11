@@ -1,8 +1,7 @@
-#ifndef TYPECHECKER_H
-#define TYPECHECKER_H
+#pragma once
 
 class Program;
 
 int Typecheck( Program& program );
 
-#endif
+

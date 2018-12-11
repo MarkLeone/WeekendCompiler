@@ -1,5 +1,4 @@
-#ifndef TOKEN_H
-#define TOKEN_H
+#pragma once
 
 #include <cassert>
 #include <iosfwd>
@@ -145,4 +144,4 @@ class Token
 };
 
 
-#endif
+

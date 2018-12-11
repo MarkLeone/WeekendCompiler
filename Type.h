@@ -1,5 +1,4 @@
-#ifndef TYPE_H
-#define TYPE_H
+#pragma once
 
 #include <cassert>
 
@@ -25,4 +24,4 @@ inline const char* ToString( Type type )
     return "";
 }
 
-#endif
+

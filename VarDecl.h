@@ -1,5 +1,4 @@
-#ifndef DECL_H
-#define DECL_H
+#pragma once
 
 #include "Type.h"
 #include <cassert>
@@ -42,4 +41,4 @@ inline std::ostream& operator<<( std::ostream& out, const VarDecl& varDecl )
     return out << ToString( varDecl.GetType() ) << ' ' << varDecl.GetName();
 }
 
-#endif
+

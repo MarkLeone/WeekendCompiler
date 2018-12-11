@@ -1,5 +1,4 @@
-#ifndef FUNC_DEF_H
-#define FUNC_DEF_H
+#pragma once
 
 #include "Fwd.h"
 #include "Stmt.h"
@@ -42,4 +41,3 @@ class FuncDef
 
 using FuncDefPtr = std::unique_ptr<FuncDef>;
 
-#endif

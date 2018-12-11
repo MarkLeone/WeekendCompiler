@@ -123,7 +123,12 @@ class CodegenExp : public ExpVisitor, CodegenBase
         if( funcName == "+" )
             return GetBuilder()->CreateAdd( args.at( 0 ), args.at( 1 ) );
         else if( funcName == "-" )
-            return GetBuilder()->CreateSub( args.at( 0 ), args.at( 1 ) );
+        {
+            if( args.size() == 1 )
+                return GetBuilder()->CreateNeg( args.at( 0 ) );
+            else
+                return GetBuilder()->CreateSub( args.at( 0 ), args.at( 1 ) );
+        }
         else if( funcName == "*" )
             return GetBuilder()->CreateMul( args.at( 0 ), args.at( 1 ) );
         else if( funcName == "/" )

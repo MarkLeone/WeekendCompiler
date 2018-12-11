@@ -1,5 +1,4 @@
-#ifndef FWD_H
-#define FWD_H
+#pragma once
 
 #include <memory>
 
@@ -30,4 +29,4 @@ using SeqStmtPtr = std::unique_ptr<SeqStmt>;
 using StmtPtr    = std::unique_ptr<Stmt>;
 using VarDeclPtr = std::unique_ptr<VarDecl>;
 
-#endif
+

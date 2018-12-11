@@ -1,5 +1,4 @@
-#ifndef TOKEN_STREAM_H
-#define TOKEN_STREAM_H
+#pragma once
 
 #include "Lexer.h"
 
@@ -33,4 +32,4 @@ class TokenStream
     Token       m_token;
 };
 
-#endif
+

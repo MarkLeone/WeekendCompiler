@@ -1,5 +1,4 @@
-#ifndef SCOPE_H
-#define SCOPE_H
+#pragma once
 
 #include "VarDecl.h"
 #include <string>
@@ -34,4 +33,4 @@ class Scope
     const Scope* m_parent;
 };
 
-#endif
+
