@@ -13,10 +13,29 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Support/raw_ostream.h>
 
 #include <iostream>
 
+void dumpSyntax( const Program& program, const char* srcFilename )
+{
+    if ( !getenv("ENABLE_DUMP") )
+        return;
+    std::string   filename( std::string( srcFilename ) + ".syn" );
+    std::ofstream out( filename );
+    out << program << std::endl;
+}
+
+void dumpIR( llvm::Module& module, const char* srcFilename, const char* what )
+{
+    if ( !getenv("ENABLE_DUMP") )
+        return;
+    std::string   filename( std::string( srcFilename ) + what + ".ll" );
+    std::ofstream stream( filename );
+    llvm::raw_os_ostream out( stream );
+    out << module;
+}
 
 int main( int argc, const char* const* argv )
 {
@@ -40,16 +59,16 @@ int main( int argc, const char* const* argv )
     ProgramPtr  program( ParseProgram( tokens ) );
     if( !program )
         return -1;  // Error already reported
+    dumpSyntax( *program, filename );
 
     int status = Typecheck( *program );
     if( status )
         return status;
-    // std::cout << *program << std::endl;
 
     // Generate LLVM IR.
     llvm::LLVMContext context;
     std::unique_ptr<llvm::Module> module( Codegen( &context, *program ) );
-    // llvm::outs() << *module;
+    dumpIR( *module, filename, "initial" );
 
     // Construct JIT engine and use data layout for target-specific optimizations.
     SimpleJIT jit;
@@ -65,6 +84,7 @@ int main( int argc, const char* const* argv )
     for( Function& function : *module )
         functionPasses.run( function );
     modulePasses.run( *module );
+    dumpIR( *module, filename, "optimized" );
 
     // Use the JIT engine to generate native code.
     VModuleKey key = jit.addModule( std::move(module) );
