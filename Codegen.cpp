@@ -14,12 +14,22 @@
 
 using namespace llvm;
 
+// The symbol table maps variable declarations to LLVM values.  Local variables are mapped to alloca
+// pointers, while function parameters are mapped to their LLVM equivalents.
 using SymbolTable = std::map<const VarDecl*, Value*>;
+
+// The function table maps function definitions to their LLVM equivalents.
 using FunctionTable = std::map<const FuncDef*, Function*>;
 
+namespace {
+
+// Base class for expression and statement code generators, which holds the LLVM context, module,
+// and IR builder, providing various helper routines.
 class CodegenBase
 {
   public:
+    // In addition to the LLVM context, module, and builder, the base class holds boolean and integer
+    // types.
     CodegenBase( LLVMContext* context, Module* module, IRBuilder<>* builder )
         : m_context( context )
         , m_module( module )
@@ -35,7 +45,7 @@ class CodegenBase
 
     IRBuilder<>* GetBuilder() { return m_builder; }
 
-
+    // Convert a type to its LLVM equivalent.
     llvm::Type* ConvertType(::Type type)
     {
         switch (type)
@@ -56,8 +66,10 @@ class CodegenBase
 
     llvm::Type* GetIntType() const { return m_intType; }
 
+    // Generate LLVM IR for a constant boolean.
     Constant* GetBool( bool b ) const { return ConstantInt::get( GetBoolType(), int(b), false /*isSigned*/ ); }
 
+    // Generate LLVM IR for a constant integer.
     Constant* GetInt( int i ) const { return ConstantInt::get( GetIntType(), i, true /*isSigned*/ ); }
 
   protected:
@@ -68,6 +80,7 @@ class CodegenBase
     llvm::Type*  m_intType;
 };
 
+// Expression code generator.
 class CodegenExp : public ExpVisitor, CodegenBase
 {
   public:
@@ -79,15 +92,18 @@ class CodegenExp : public ExpVisitor, CodegenBase
     {
     }
 
+    // Helper routine to codegen a subexpression.  The visitor operates on
+    // non-const expressions, so we must const_cast when dispatching.
     Value* Codegen( const Exp& exp ) { return reinterpret_cast<Value*>( const_cast<Exp&>( exp ).Dispatch( *this ) ); }
 
     void* Visit( BoolExp& exp ) override { return GetBool( exp.GetValue() ); }
 
     void* Visit( IntExp& exp ) override { return GetInt( exp.GetValue() ); }
 
+    // Generate code for a variable reference.
     void* Visit( VarExp& exp ) override
     {
-        // The typechecker links variable references to their declarations.
+        // The typechecker linked variable references to their declarations.
         const VarDecl* varDecl = exp.GetVarDecl();
         assert( varDecl );
 
@@ -108,6 +124,7 @@ class CodegenExp : public ExpVisitor, CodegenBase
         return nullptr;
     }
 
+    // Generate code for a function call.
     void* Visit( CallExp& exp ) override
     {
         // Convert the arguments to LLVM values.
@@ -118,7 +135,7 @@ class CodegenExp : public ExpVisitor, CodegenBase
             args.push_back( Codegen( *arg ) );
         }
 
-        // Builtin definition?
+        // Builtin definition?  TODO: use an enum for builtin functions, rather than matching the name.
         const std::string& funcName = exp.GetFuncName();
         if( funcName == "+" )
             return GetBuilder()->CreateAdd( args.at( 0 ), args.at( 1 ) );
@@ -178,6 +195,7 @@ class CodegenExp : public ExpVisitor, CodegenBase
 };
 
 
+// Statement code generator.
 class CodegenStmt : public StmtVisitor, CodegenBase
 {
   public:
@@ -191,16 +209,22 @@ class CodegenStmt : public StmtVisitor, CodegenBase
     {
     }
 
+    // Helper routine to codegen a subexpression.  The visitor operates on
+    // non-const statements, so we must const_cast when dispatching.
     void Codegen( const Stmt& stmt )
     {
         const_cast<Stmt&>( stmt ).Dispatch( *this );
     }
 
+
+    // Generate code for a function call statement.
     void Visit( CallStmt& stmt ) override
     {
         m_codegenExp.Codegen( stmt.GetCallExp() );
     }
 
+
+    // Generate code for an assignment statement.
     void Visit( AssignStmt& stmt ) override
     {
         // The typechecker links assignments to variable declarations.  Assignments to function
@@ -218,6 +242,8 @@ class CodegenStmt : public StmtVisitor, CodegenBase
         GetBuilder()->CreateStore(rvalue, location);
     }
 
+
+    // Generate code for a local variable declaration.
     void Visit( DeclStmt& stmt ) override
     {
         const VarDecl* varDecl = stmt.GetVarDecl();
@@ -238,12 +264,14 @@ class CodegenStmt : public StmtVisitor, CodegenBase
         }
     }
 
+    // Generate code for a return statement.
     void Visit( ReturnStmt& stmt ) override
     {
         Value* result = m_codegenExp.Codegen( stmt.GetExp() );
         GetBuilder()->CreateRet( result );
     }
 
+    // Generate code for a sequence of statements.
     void Visit( SeqStmt& seq ) override
     {
         for( const StmtPtr& stmt : seq.Get() )
@@ -252,6 +280,7 @@ class CodegenStmt : public StmtVisitor, CodegenBase
         }
     }
 
+    // Generate code for an "if" statement.
     void Visit( IfStmt& stmt ) override
     {
         // Generate code for the conditional expression.
@@ -290,6 +319,7 @@ class CodegenStmt : public StmtVisitor, CodegenBase
         GetBuilder()->SetInsertPoint( joinBlock );
     }
 
+    // Generate code for a while loop.
     void Visit( WhileStmt& stmt ) override
     {
         // Create a basic block for the start of the loop.
@@ -322,6 +352,7 @@ class CodegenStmt : public StmtVisitor, CodegenBase
     Function*      m_currentFunction;
     CodegenExp     m_codegenExp;
 
+    // Generate code for the condition expression in an "if" statement or a while loop.
     Value* codegenCondExp( const Exp& exp )
     {
         Value* condition = m_codegenExp.Codegen( exp );
@@ -334,6 +365,8 @@ class CodegenStmt : public StmtVisitor, CodegenBase
     }
 };
 
+
+// Function definition code generator.
 class CodegenFunc : public CodegenBase
 {
   public:
@@ -344,6 +377,7 @@ class CodegenFunc : public CodegenBase
     {
     }
 
+    // Generate code for a function definition.
     void Codegen( const FuncDef* funcDef )
     {
         // Don't generate code for builtin function declarations.
@@ -394,14 +428,25 @@ class CodegenFunc : public CodegenBase
     FunctionTable* m_functions;
 };
 
+} // anonymous namespace
+
+
+// Generate code for a program.
 std::unique_ptr<Module> Codegen(LLVMContext* context, const Program& program)
 {
+    // Construct LLVM module.
     std::unique_ptr<Module> module( new Module( "module", *context ) );
+
+    // The function table maps function definitions to their LLVM equivalents.
     FunctionTable functions;
+
+    // Generate code for each function, adding LLVM functions to the odule.
     for( const FuncDefPtr& funcDef : program.GetFunctions() )
     {
         CodegenFunc( context, module.get(), &functions ).Codegen( funcDef.get() );
     }
+
+    // Verify the module, which catches malformed instructions and type errors.
     assert(!verifyModule(*module, &llvm::errs()));
     return std::move( module );
 }

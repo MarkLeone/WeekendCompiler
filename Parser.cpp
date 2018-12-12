@@ -203,6 +203,7 @@ Type parseType( TokenStream& tokens )
     }
 }
 
+// Parse an identifier.
 std::string parseId( TokenStream& tokens )
 {
     Token id( *tokens++ );
@@ -210,6 +211,7 @@ std::string parseId( TokenStream& tokens )
         throw ParseError( "Invalid declaration (expected identifier)" );
     return id.GetId();
 }
+
 
 // VarDecl -> Type Id
 VarDeclPtr parseVarDecl( VarDecl::Kind kind, TokenStream& tokens )
@@ -219,6 +221,7 @@ VarDeclPtr parseVarDecl( VarDecl::Kind kind, TokenStream& tokens )
     return std::make_unique<VarDecl>( kind, type, id );
 }
 
+    
 // Stmt -> Id = Exp ;
 //       | Id ( Args ) ;
 //       | VarDecl ;
@@ -320,6 +323,7 @@ SeqStmtPtr parseSeq( TokenStream& tokens )
     return std::make_unique<SeqStmt>( std::move( stmts ) );
 }
 
+// FuncId -> Id | operator BinaryOp
 std::string parseFuncId( TokenStream& tokens )
 {
     if( *tokens == kTokenOperator )
