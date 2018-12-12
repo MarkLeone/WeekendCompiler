@@ -78,22 +78,25 @@ static int getPrecedence( const Token& token )
     {
         case kTokenTimes:
         case kTokenDiv:
-            return 5;
+            return 6;
         case kTokenMod:
         case kTokenPlus:
         case kTokenMinus:
-            return 4;
+            return 5;
         case kTokenLT:
         case kTokenLE:
         case kTokenGT:
         case kTokenGE:
-            return 3;
+            return 4;
         case kTokenEQ:
         case kTokenNE:
-            return 2;
+            return 3;
         case kTokenAnd:
-            return 1;
+            return 2;
         case kTokenOr:
+            return 1;
+        case kTokenQuestion:
+        case kTokenColon:
             return 0;
         default:
             return -1;
@@ -121,9 +124,26 @@ static ExpPtr parseRemainingExp( ExpPtr leftExp, int leftPrecedence, TokenStream
             rightExp = parseRemainingExp( std::move( rightExp ), precedence + 1, tokens );
         }
 
-        // Construct a call expression with the left and right expressions.
-        leftExp = std::make_unique<CallExp>( opToken.ToString(),
-                                             std::move( leftExp ), std::move( rightExp ) );
+        // Construct the appropriate expression from the left and right subexpressions.
+        if( opToken == kTokenQuestion )
+        {
+            // Construct a partial conditional expression (see below).
+            leftExp = std::make_unique<CondExp>
+                ( std::move( leftExp ), std::move( rightExp ), ExpPtr() );
+        }
+        else if( opToken == kTokenColon )
+        {
+            // Finish construction of partial conditional expression (see above).
+            CondExp* condExp = dynamic_cast<CondExp*>( leftExp.get() );
+            assert( condExp );
+            condExp->SetElseExp( std::move( rightExp ) );
+        }
+        else
+        {
+            // Construct a call expression with the left and right expressions.
+            leftExp = std::make_unique<CallExp>
+                ( opToken.ToString(), std::move( leftExp ), std::move( rightExp ) );
+        }
     }
 }
 

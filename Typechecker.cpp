@@ -78,6 +78,18 @@ class ExpTypechecker : public ExpVisitor
         return nullptr;
     }
 
+    void* Visit( CondExp& exp ) override
+    {
+        Check( exp.GetCondExp() );
+        assert( exp.GetCondExp().GetType() == kTypeBool || exp.GetCondExp().GetType() == kTypeInt );
+
+        Check( exp.GetThenExp() );
+        Check( exp.GetElseExp() );
+        if( exp.GetThenExp().GetType() != exp.GetElseExp().GetType() )
+            throw TypeError( "Type mismatch in conditional expression" );
+        return nullptr;
+    }
+    
   private:
     const Scope&     m_scope;
     const FuncTable& m_funcTable;
@@ -192,14 +204,7 @@ class StmtTypechecker : public StmtVisitor
     void CheckCondExp( const Exp& exp)
     {
         CheckExp( exp );
-        switch (exp.GetType())
-        {
-            case kTypeBool:
-            case kTypeInt:
-                return;
-            default:
-                throw TypeError( "Expected integer condition expression" );
-        }
+        assert( exp.GetType() == kTypeBool || exp.GetType() == kTypeInt );
     }
 
   private:

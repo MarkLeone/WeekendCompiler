@@ -46,6 +46,14 @@ class ExpPrinter : public ExpVisitor
         return nullptr;
     }
 
+    void* Visit( CondExp& exp ) override
+    {
+        m_out << "(" << exp.GetCondExp() << ")"
+              << "? (" << exp.GetThenExp()
+              << ") : (" << exp.GetElseExp() << ")";
+        return nullptr;
+    }
+    
   private:
     std::ostream& m_out;
 };
