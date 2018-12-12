@@ -9,7 +9,6 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
-#include <llvm/IR/Verifier.h>
 #include <llvm/Support/raw_ostream.h>
 
 using namespace llvm;
@@ -172,9 +171,9 @@ class CodegenExp : public ExpVisitor, CodegenBase
             return GetBuilder()->CreateZExt( args.at( 0 ), GetIntType() );
         // TODO: proper short-circuiting for && and ||.
         else if (funcName == "&&")
-            return GetBuilder()->CreateSelect( args.at( 0 ), GetBool( true ), args.at( 1 ) );
-        else if (funcName == "||")
             return GetBuilder()->CreateSelect( args.at( 0 ), args.at( 1 ), GetBool( false ) );
+        else if (funcName == "||")
+            return GetBuilder()->CreateSelect( args.at( 0 ), GetBool( true ), args.at( 1 ) );
 
         // The typechecker linked function call sites to their definitions.
         const FuncDef* funcDef = exp.GetFuncDef();
@@ -250,7 +249,8 @@ class CodegenStmt : public StmtVisitor, CodegenBase
         llvm::Type* type = ConvertType(varDecl->GetType());
         
         // Generate an "alloca" instruction, which goes in entry block of the current function.
-        IRBuilder<> allocaBuilder( &m_currentFunction->getEntryBlock() );
+        IRBuilder<> allocaBuilder( &m_currentFunction->getEntryBlock(),
+                                   m_currentFunction->getEntryBlock().getFirstInsertionPt() );
         Value* location = allocaBuilder.CreateAlloca( type, nullptr /*arraySize*/, varDecl->GetName() );
 
         // Store the variable location in the symbol table.
@@ -398,6 +398,10 @@ class CodegenFunc : public CodegenBase
         FunctionType* funcType   = FunctionType::get( returnType, paramTypes, false /*isVarArg*/ );
         Function* function = Function::Create( funcType, Function::ExternalLinkage, funcDef->GetName(), GetModule() );
 
+        // The main function has external linkage.  Other functions are
+        // "internal", which encourages inlining.
+        function->setLinkage( funcDef->GetName() == "main" ? Function::ExternalLinkage : Function::InternalLinkage );
+
         // Update the function table.
         m_functions->insert( FunctionTable::value_type( funcDef, function ) );
 
@@ -445,8 +449,5 @@ std::unique_ptr<Module> Codegen(LLVMContext* context, const Program& program)
     {
         CodegenFunc( context, module.get(), &functions ).Codegen( funcDef.get() );
     }
-
-    // Verify the module, which catches malformed instructions and type errors.
-    assert(!verifyModule(*module, &llvm::errs()));
     return std::move( module );
 }

@@ -68,7 +68,13 @@ ExpPtr parsePrimaryExp( TokenStream& tokens )
                 // Construct VarExp
                 return std::make_unique<VarExp>( token.GetId() );
         }
-        // Parenthesize expression?
+        // Type conversion?
+        case kTokenBool:
+        case kTokenInt:
+        {
+            return std::make_unique<CallExp>( token.ToString(), parseArgs( tokens ) );
+        }
+        // Parenthesized expression?
         case kTokenLparen:
         {
             skipToken( kTokenLparen, tokens );

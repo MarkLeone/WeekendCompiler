@@ -67,7 +67,7 @@ class StmtPrinter : public StmtVisitor
 
     void Visit( DeclStmt& stmt ) override
     {
-        m_out << stmt.GetVarDecl();
+        m_out << *stmt.GetVarDecl();
         if( stmt.HasInitExp() )
             m_out << " = " << stmt.GetInitExp();
         m_out << ';';

@@ -13,6 +13,7 @@
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/Verifier.h>
 #include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Support/raw_ostream.h>
 
@@ -86,6 +87,9 @@ int main( int argc, const char* const* argv )
     llvm::LLVMContext context;
     std::unique_ptr<llvm::Module> module( Codegen( &context, *program ) );
     dumpIR( *module, filename, "initial" );
+
+    // Verify the module, which catches malformed instructions and type errors.
+    assert(!verifyModule(*module, &llvm::errs()));
 
     // Construct JIT engine and use data layout for target-specific optimizations.
     SimpleJIT jit;
