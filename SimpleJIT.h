@@ -18,8 +18,9 @@
 using namespace llvm;
 using namespace llvm::orc;
 
-/// A simple JIT engine that encapsulates the LLVM ORC JIT API.  Adapted from
-/// the LLVM KaleidoscopeJIT example.
+/// A simple JIT engine that encapsulates the LLVM ORC JIT API.
+/// (JIT = Just In Time, ORC = On Request Compilation)
+/// Adapted from the LLVM KaleidoscopeJIT example.
 class SimpleJIT {
 public:
     /// Construct JIT engine, initializing the resolver, object layer, and compile layer.

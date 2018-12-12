@@ -40,6 +40,8 @@ BinaryOp ->  *  |  /  |  %
 
 ----------------------------------------------------------------------
 
+// Alternative: precedence climbing
+
 PrimaryExp -> true | false
             | Num
             | Id

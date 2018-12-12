@@ -5,6 +5,8 @@
 #include "Stmt.h"
 #include "TokenStream.h"
 
+namespace {
+
 // Exceptions are used internally by the parser to simplify error checking.
 // Any parse error is caught by the top-level parsing routine, which reports
 // an error and returns an error status.
@@ -18,42 +20,55 @@ class ParseError : public std::runtime_error
 };
 
 // Forward declarations
-static ExpPtr parseExp( TokenStream& tokens );
-static std::vector<ExpPtr> parseArgs( TokenStream& tokens );
-static SeqStmtPtr parseSeq( TokenStream& tokens );
+ExpPtr parseExp( TokenStream& tokens );
+std::vector<ExpPtr> parseArgs( TokenStream& tokens );
+SeqStmtPtr parseSeq( TokenStream& tokens );
+ExpPtr parseRemainingExp( ExpPtr leftExp, int leftPrecedence, TokenStream& tokens );
+int getPrecedence( const Token& token );
 
+    
 // Skip the specified token, throwing ParseError if it's not present.
-static void skipToken( const Token& expected, TokenStream& tokens )
+void skipToken( const Token& expected, TokenStream& tokens )
 {
     Token token( *tokens++ );
     if( token != expected )
         throw ParseError( std::string( "Expected '" ) + expected.ToString() + "'" );
 }
 
+    
 // PrimaryExp -> true | false
 //             | Num
 //             | Id
 //             | Id ( Args )
 //             | ( Exp )
 //             | UnaryOp PrimaryExp
-static ExpPtr parsePrimaryExp( TokenStream& tokens )
+ExpPtr parsePrimaryExp( TokenStream& tokens )
 {
+    // Fetch the next token, advancing the token stream.  (Note that this
+    // dereferences, then increments the TokenStream.)
     Token token( *tokens++ );
     switch( token.GetTag() )
     {
+        // Boolean constant?
         case kTokenTrue:
             return std::make_unique<BoolExp>( true );
         case kTokenFalse:
             return std::make_unique<BoolExp>( false );
+        // Integer constant?
         case kTokenNum:
             return std::make_unique<IntExp>( token.GetNum() );
+        // An identifier might be a variable or the start of a function call.
         case kTokenId:
         {
+            // If the next token is a left paren, it's a function call.
             if( *tokens == kTokenLparen )
+                // Parse argument expressions and construct CallExp.
                 return std::make_unique<CallExp>( token.GetId(), parseArgs( tokens ) );
             else
+                // Construct VarExp
                 return std::make_unique<VarExp>( token.GetId() );
         }
+        // Parenthesize expression?
         case kTokenLparen:
         {
             skipToken( kTokenLparen, tokens );
@@ -61,6 +76,7 @@ static ExpPtr parsePrimaryExp( TokenStream& tokens )
             skipToken( kTokenRparen, tokens );
             return exp;
         }
+        // Prefix minus?
         case kTokenMinus:
         {
             Token unaryOp( *tokens++ );
@@ -72,7 +88,78 @@ static ExpPtr parsePrimaryExp( TokenStream& tokens )
     }
 }
 
-static int getPrecedence( const Token& token )
+
+// Args    -> ( ArgList )
+// ArgList -> Exp
+//          | Exp , ArgList
+std::vector<ExpPtr> parseArgs( TokenStream& tokens )
+{
+    skipToken( kTokenLparen, tokens );
+    std::vector<ExpPtr> exps;
+    if( *tokens != kTokenRparen )
+    {
+        exps.push_back( parseExp( tokens ) );
+        while( *tokens == kTokenComma )
+        {
+            exps.push_back( parseExp( ++tokens ) );
+        }
+    }
+    skipToken( kTokenRparen, tokens );
+
+    return std::move( exps );
+}
+
+
+// Parse an expression with infix operators.
+ExpPtr parseExp( TokenStream& tokens )
+{
+    // First, parse a primary expression, which contains no infix operators.
+    ExpPtr leftExp( parsePrimaryExp( tokens ) );
+
+    // The next token might be an operator.  Call a helper routine
+    // to parse the remainder of the expression.
+    return parseRemainingExp( std::move( leftExp ), 0 /*initial precedence*/, tokens );
+}
+
+// This routine implements an operator precedence expression parser.
+// It assembles primary expressions into call expressions based
+// on the precedence of the operators it encounters.  For example,
+// "1 + 2 * 3" is parsed as "1 + (2 * 3)" because multiplication has
+// higher precedence than addition.
+//
+// After parsing an expression (leftExp) whose operator has the given
+// precedence (or zero if it has no operator), parse the remainder of
+// the expression from the given token stream.
+ExpPtr parseRemainingExp( ExpPtr leftExp, int leftPrecedence, TokenStream& tokens )
+{
+    while( true )
+    {
+        // If the previous operator has higher precedence than the current one,
+        // it claims the prevously parsed expression.
+        int precedence = getPrecedence( *tokens );
+        if( leftPrecedence > precedence )
+            return leftExp;
+
+        // Parse the current operator and the current primary expression.
+        Token opToken( *tokens++ );
+        ExpPtr rightExp = parsePrimaryExp( tokens );
+
+        // If the next operator has higher precedence, it claims the current expression.
+        int rightPrecedence = getPrecedence( *tokens );
+        if( rightPrecedence > precedence )
+        {
+            rightExp = parseRemainingExp( std::move( rightExp ), precedence + 1, tokens );
+        }
+
+        // Construct a call expression with the left and right expressions.
+        leftExp = std::make_unique<CallExp>( opToken.ToString(),
+                                             std::move( leftExp ), std::move( rightExp ) );
+    }
+}
+
+// If the given token is an operator, return its precedence (from 0 to 5).
+// Otherwise return -1.
+int getPrecedence( const Token& token )
 {
     switch( token.GetTag() )
     {
@@ -100,61 +187,9 @@ static int getPrecedence( const Token& token )
     }
 }
 
-static ExpPtr parseRemainingExp( ExpPtr leftExp, int leftPrecedence, TokenStream& tokens )
-{
-    while( true )
-    {
-        // If the previous operator has higher precedence than the current one,
-        // it claims the prevously parsed expression.
-        int precedence = getPrecedence( *tokens );
-        if( leftPrecedence > precedence )
-            return leftExp;
-
-        // Parse the current operator and the current primary expression.
-        Token opToken( *tokens++ );
-        ExpPtr rightExp = parsePrimaryExp( tokens );
-
-        // If the next operator has higher precedence, it claims the current expression.
-        int rightPrecedence = getPrecedence( *tokens );
-        if( rightPrecedence > precedence )
-        {
-            rightExp = parseRemainingExp( std::move( rightExp ), precedence + 1, tokens );
-        }
-
-        // Construct a call expression with the left and right expressions.
-        leftExp = std::make_unique<CallExp>( opToken.ToString(),
-                                             std::move( leftExp ), std::move( rightExp ) );
-    }
-}
-
-static ExpPtr parseExp( TokenStream& tokens )
-{
-    ExpPtr leftExp( parsePrimaryExp( tokens ) );
-    return parseRemainingExp( std::move( leftExp ), 0 /*initial precedence*/, tokens );
-}
-
-// Args    -> ( ArgList )
-// ArgList -> Exp
-//          | Exp , ArgList
-static std::vector<ExpPtr> parseArgs( TokenStream& tokens )
-{
-    skipToken( kTokenLparen, tokens );
-    std::vector<ExpPtr> exps;
-    if( *tokens != kTokenRparen )
-    {
-        exps.push_back( parseExp( tokens ) );
-        while( *tokens == kTokenComma )
-        {
-            exps.push_back( parseExp( ++tokens ) );
-        }
-    }
-    skipToken( kTokenRparen, tokens );
-
-    return std::move( exps );
-}
 
 // Type -> bool | int
-static Type parseType( TokenStream& tokens )
+Type parseType( TokenStream& tokens )
 {
     Token typeName( *tokens++ );
     switch( typeName.GetTag() )
@@ -168,7 +203,7 @@ static Type parseType( TokenStream& tokens )
     }
 }
 
-static std::string parseId( TokenStream& tokens )
+std::string parseId( TokenStream& tokens )
 {
     Token id( *tokens++ );
     if( id.GetTag() != kTokenId )
@@ -177,7 +212,7 @@ static std::string parseId( TokenStream& tokens )
 }
 
 // VarDecl -> Type Id
-static VarDeclPtr parseVarDecl( VarDecl::Kind kind, TokenStream& tokens )
+VarDeclPtr parseVarDecl( VarDecl::Kind kind, TokenStream& tokens )
 {
     Type        type( parseType( tokens ) );
     std::string id( parseId( tokens ) );
@@ -192,7 +227,7 @@ static VarDeclPtr parseVarDecl( VarDecl::Kind kind, TokenStream& tokens )
 //       | if ( Exp ) Stmt
 //       | if ( Exp ) Stmt else Stmt
 //       | while ( Exp ) Stmt
-static StmtPtr parseStmt( TokenStream& tokens )
+StmtPtr parseStmt( TokenStream& tokens )
 {
     Token token( *tokens );
     switch( token.GetTag() )
@@ -273,7 +308,7 @@ static StmtPtr parseStmt( TokenStream& tokens )
 }
 
 // Seq -> { Stmt* }
-static SeqStmtPtr parseSeq( TokenStream& tokens )
+SeqStmtPtr parseSeq( TokenStream& tokens )
 {
     skipToken( kTokenLbrace, tokens );
     std::vector<StmtPtr> stmts;
@@ -285,7 +320,7 @@ static SeqStmtPtr parseSeq( TokenStream& tokens )
     return std::make_unique<SeqStmt>( std::move( stmts ) );
 }
 
-static std::string parseFuncId( TokenStream& tokens )
+std::string parseFuncId( TokenStream& tokens )
 {
     if( *tokens == kTokenOperator )
     {
@@ -300,7 +335,7 @@ static std::string parseFuncId( TokenStream& tokens )
 }
 
 // FuncDef -> Type Id ( VarDecl* ) Seq
-static FuncDefPtr parseFuncDef( TokenStream& tokens )
+FuncDefPtr parseFuncDef( TokenStream& tokens )
 {
     // Parse return type and function id.
     Type        returnType( parseType( tokens ) );
@@ -329,6 +364,8 @@ static FuncDefPtr parseFuncDef( TokenStream& tokens )
 
     return std::make_unique<FuncDef>( returnType, id, std::move( params ), std::move( body ) );
 }
+
+} // anonymouse namespace
 
 // Parse the given tokens, adding function definitions to the given program.
 // Returns zero for success (otherwise an error message is reported).
