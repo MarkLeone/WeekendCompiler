@@ -164,39 +164,3 @@ class CallExp : public Exp
 /// Unique pointer to function call expression
 using CallExpPtr = std::unique_ptr<CallExp>;
 
-
-/// Conditional expression, e.g. (x ? y : z) The parser desugars boolean
-/// operators (&&, ||) into conditional expressions, which ensures that they
-/// "short circuit" correctly.
-class CondExp : public Exp
-{
-  public:
-    /// Construct conditional expression.
-    CondExp( ExpPtr condExp, ExpPtr thenExp, ExpPtr elseExp )
-        : m_condExp( std::move( condExp ) )
-        , m_thenExp( std::move( thenExp ) )
-        , m_elseExp( std::move( elseExp ) )
-    {
-    }
-
-    /// Get the condition expression.
-    const Exp& GetCondExp() const { return *m_condExp; }
-
-    /// Get the "then" expression.
-    const Exp& GetThenExp() const { return *m_thenExp; }
-
-    /// Get the "else" expression.
-    const Exp& GetElseExp() const { return *m_elseExp; }
-
-    /// Set the "else" expression.  The parser needs this to finish the
-    /// construction of a partially constructed expression.
-    void SetElseExp( ExpPtr elseExp ) { m_elseExp = std::move( elseExp ); }
-
-    /// Dispatch to visitor.
-    void* Dispatch( ExpVisitor& visitor ) override { return visitor.Visit( *this ); }
-
-  private:    
-    ExpPtr m_condExp;
-    ExpPtr m_thenExp;
-    ExpPtr m_elseExp;
-};

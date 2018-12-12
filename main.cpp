@@ -72,7 +72,7 @@ int main( int argc, const char* const* argv )
     }
 
     // Parse and typecheck builtin functions.
-    ProgramPtr  program( make_unique<Program>() );
+    ProgramPtr  program( new Program );
     status = parseAndTypecheck( GetBuiltins(), program.get() );
     assert(status == 0);
 

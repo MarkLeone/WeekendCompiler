@@ -47,8 +47,6 @@ enum TokenTag
     kTokenComma,
     kTokenAssign,
     kTokenSemicolon,
-    kTokenColon,
-    kTokenQuestion,
     kTokenEOF
 };
 

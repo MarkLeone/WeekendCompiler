@@ -167,11 +167,6 @@ class CodegenExp : public ExpVisitor, CodegenBase
         return GetBuilder()->CreateCall( function, args, funcDef->GetName() );
     }
 
-    void* Visit( CondExp& exp ) override
-    {
-        return nullptr; // XXX
-    }
-    
   private:
     SymbolTable* m_symbols;
     FunctionTable* m_functions;
@@ -396,7 +391,7 @@ class CodegenFunc : public CodegenBase
 
 std::unique_ptr<Module> Codegen(LLVMContext* context, const Program& program)
 {
-    std::unique_ptr<Module> module( make_unique<Module>( "module", *context ) );
+    std::unique_ptr<Module> module( new Module( "module", *context ) );
     FunctionTable functions;
     for( const FuncDefPtr& funcDef : program.GetFunctions() )
     {

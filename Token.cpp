@@ -42,8 +42,6 @@ std::string Token::ToString() const
         case kTokenComma:     return ",";
         case kTokenAssign:    return "=";
         case kTokenSemicolon: return ";";
-        case kTokenColon:     return ":";
-        case kTokenQuestion:  return "?";
         case kTokenEOF:       return "<EOF>";
     }
     assert(false && "Unhandled token kind");

@@ -7,9 +7,8 @@
 class Exp;
 class BoolExp;
 class IntExp;
-class VarExp;
 class CallExp;
-class CondExp;
+class VarExp;
 
 class Stmt;
 class AssignStmt;

@@ -54,8 +54,6 @@ Token Lexer(const char*& source)
         ","        { return kTokenComma; }
         "="        { return kTokenAssign; }
         ";"        { return kTokenSemicolon; }
-        ":"        { return kTokenColon; }
-        "?"        { return kTokenQuestion; }
         space      { goto start; }
         eof        { return Token( kTokenEOF ); }
         .          { std::cerr << "Discarding unexpected character '" 

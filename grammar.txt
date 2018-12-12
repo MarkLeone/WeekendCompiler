@@ -31,7 +31,6 @@ Exp -> true | false
      | ( Exp )
      | UnaryOp Exp
      | Exp BinaryOp Exp
-     | Exp ? Exp : Exp
 
 UnaryOp  ->  -  |  !
 BinaryOp ->  *  |  /  |  %
