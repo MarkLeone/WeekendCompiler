@@ -153,6 +153,11 @@ class CodegenExp : public ExpVisitor, CodegenBase
             return GetBuilder()->CreateICmpNE( args.at( 0 ), GetInt( 0 ) );
         else if( funcName == "int" )
             return GetBuilder()->CreateZExt( args.at( 0 ), GetIntType() );
+        // TODO: proper short-circuiting for && and ||.
+        else if (funcName == "&&")
+            return GetBuilder()->CreateSelect( args.at( 0 ), GetBool( true ), args.at( 1 ) );
+        else if (funcName == "||")
+            return GetBuilder()->CreateSelect( args.at( 0 ), args.at( 1 ), GetBool( false ) );
 
         // The typechecker linked function call sites to their definitions.
         const FuncDef* funcDef = exp.GetFuncDef();
