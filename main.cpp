@@ -19,54 +19,37 @@
 #include <fstream>
 #include <iostream>
 
-void dumpSyntax( const Program& program, const char* srcFilename )
+#ifndef OPT_LEVEL
+/// Optimization level, which defaults to -O2.
+#define OPT_LEVEL 2
+#endif
+
+namespace {
+    
+// Forward declarations.
+void optimize( Module* module, int optLevel );
+int  readFile( const char* filename, std::vector<char>* buffer );
+void dumpSyntax( const Program& program, const char* srcFilename );
+void dumpIR( llvm::Module& module, const char* srcFilename, const char* what );
+
+// Parse and typecheck the given source code, adding definitions to the given Program.
+// This is used to process both builtin definitions and user code.
+int parseAndTypecheck( const char* source, Program* program )
 {
-    if ( !getenv("ENABLE_DUMP") )
-        return;
-    std::string   filename( std::string( srcFilename ) + ".syn" );
-    std::ofstream out( filename );
-    out << program << std::endl;
-}
+    // Construct token stream, which encapsulates the lexer.  \see TokenStream.
+    TokenStream tokens( source );
 
-void dumpIR( llvm::Module& module, const char* srcFilename, const char* what )
-{
-    if ( !getenv("ENABLE_DUMP") )
-        return;
-    std::string   filename( std::string( srcFilename ) + "." + what + ".ll" );
-    std::ofstream stream( filename );
-    llvm::raw_os_ostream out( stream );
-    out << module;
-}
-
-// Read file into the given buffer.  Returns zero for success.
-int readFile( const char* filename, std::vector<char>* buffer )
-{
-    // Open the stream at the end, get file size, and allocate data.
-    std::ifstream in( filename, std::ifstream::ate | std::ifstream::binary );
-    if( in.fail() )
-        return -1;
-    size_t length = static_cast<size_t>( in.tellg() );
-
-    buffer->resize( length + 1 );
-
-    // Rewind and read entire file
-    in.clear();  // clear EOF
-    in.seekg( 0, std::ios::beg );
-    in.read( buffer->data(), length );
-
-    // The buffer is null-terminated (for the benefit of the Lexer).
-    (*buffer)[length] = '\0';
-    return 0;
-}
-
-int parseAndTypecheck( const char* buffer, Program* program )
-{
-    TokenStream tokens( buffer );
+    // Parse the token stream into a program.
     int status = ParseProgram( tokens, program );
+
+    // If the parser succeeded, typecheck the program.
     if( status == 0 )
         status = Typecheck( *program );
     return status;
 }
+
+} // anonymous namespace
+
 
 int main( int argc, const char* const* argv )
 {
@@ -79,7 +62,7 @@ int main( int argc, const char* const* argv )
     const char* filename = argv[1];
     int inputValue = atoi( argv[2] );
 
-    // Read source file
+    // Read source file.  TODO: use an input stream, rather than reading the entire file.
     std::vector<char> source;
     int status = readFile( argv[1], &source );
     if( status != 0 )
@@ -109,15 +92,7 @@ int main( int argc, const char* const* argv )
     module->setDataLayout( jit.getTargetMachine().createDataLayout() );
 
     // Optimize the module.
-    legacy::FunctionPassManager functionPasses( module.get() );
-    legacy::PassManager         modulePasses;
-    PassManagerBuilder          builder;
-    builder.OptLevel = 2;
-    builder.populateFunctionPassManager( functionPasses );
-    builder.populateModulePassManager( modulePasses );
-    for( Function& function : *module )
-        functionPasses.run( function );
-    modulePasses.run( *module );
+    optimize( module.get(), OPT_LEVEL );
     dumpIR( *module, filename, "optimized" );
 
     // Use the JIT engine to generate native code.
@@ -130,7 +105,73 @@ int main( int argc, const char* const* argv )
 
     // Call the main function using the input value from the command line.
     int result = mainFunc(inputValue);
-    printf("%i\n", result);
+    std::cout << result << std::endl;
     
     return 0;
 }
+
+namespace {
+
+// Optimize the module using the given optimization level (0 - 3).
+void optimize( Module* module, int optLevel )
+{
+    // Construct the function and module pass managers, which are populated
+    // with standard optimizations (e.g. constant propagation, inlining, etc.)
+    legacy::FunctionPassManager functionPasses( module );
+    legacy::PassManager         modulePasses;
+
+    // Populate the pass managers based on the optimization level.
+    PassManagerBuilder builder;
+    builder.OptLevel = optLevel;
+    builder.populateFunctionPassManager( functionPasses );
+    builder.populateModulePassManager( modulePasses );
+
+    // Run the function passes, then the module passes.
+    for( Function& function : *module )
+        functionPasses.run( function );
+    modulePasses.run( *module );
+}
+
+// Read file into the given buffer.  Returns zero for success.
+int readFile( const char* filename, std::vector<char>* buffer )
+{
+    // Open the stream at the end, get file size, and allocate data.
+    std::ifstream in( filename, std::ifstream::ate | std::ifstream::binary );
+    if( in.fail() )
+        return -1;
+    size_t length = static_cast<size_t>( in.tellg() );
+
+    buffer->resize( length + 1 );
+
+    // Rewind and read entire file
+    in.clear();  // clear EOF
+    in.seekg( 0, std::ios::beg );
+    in.read( buffer->data(), length );
+
+    // The buffer is null-terminated (for the benefit of the Lexer).
+    (*buffer)[length] = '\0';
+    return 0;
+}
+
+// Dump syntax for debugging if the "ENABLE_DUMP" environment variable is set.
+void dumpSyntax( const Program& program, const char* srcFilename )
+{
+    if ( !getenv("ENABLE_DUMP") )
+        return;
+    std::string   filename( std::string( srcFilename ) + ".syn" );
+    std::ofstream out( filename );
+    out << program << std::endl;
+}
+
+// Dump LLVM IR for debugging if the "ENABLE_DUMP" environment variable is set.
+void dumpIR( llvm::Module& module, const char* srcFilename, const char* what )
+{
+    if ( !getenv("ENABLE_DUMP") )
+        return;
+    std::string   filename( std::string( srcFilename ) + "." + what + ".ll" );
+    std::ofstream stream( filename );
+    llvm::raw_os_ostream out( stream );
+    out << module;
+}
+
+} // anonymous namespace

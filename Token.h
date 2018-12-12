@@ -108,9 +108,12 @@ class Token
         return true;
     }
 
+    /// Inequality operator.
     bool operator!=( const Token& other ) { return !( *this == other ); }
 
-
+    /// Check whether this token can be preceded by an "operator" keyword
+    /// (e.g. operator+).  This allows operators to be defined by ordinary
+    /// function definitions (see Builtins.h)
     bool IsOperator() const
     {
         switch( GetTag() )

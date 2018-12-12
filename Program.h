@@ -5,6 +5,7 @@
 class FuncDef;
 using FuncDefPtr = std::unique_ptr<FuncDef>;
 
+/// Syntax for a program, which is simply a vector of function definitions.
 class Program
 {
   public:

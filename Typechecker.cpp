@@ -5,6 +5,8 @@
 #include "Scope.h"
 #include "Stmt.h"
 #include "VarDecl.h"
+
+#include <iostream>
 #include <string>
 #include <map>
 
@@ -219,7 +221,7 @@ class Typechecker
             }
             catch( const TypeError& e )
             {
-                fprintf(stderr, "Error: %s\n", e.what());
+                std::cerr <<  "Error: " << e.what() << std::endl;
                 return -1;
             }
         }

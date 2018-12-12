@@ -18,9 +18,11 @@
 using namespace llvm;
 using namespace llvm::orc;
 
-// Adapted from LLVM example (KaleidoscopeJIT)
+/// A simple JIT engine that encapsulates the LLVM ORC JIT API.  Adapted from
+/// the LLVM KaleidoscopeJIT example.
 class SimpleJIT {
 public:
+    /// Construct JIT engine, initializing the resolver, object layer, and compile layer.
     SimpleJIT() :
         m_initialized( init() ),
         m_resolver
@@ -41,8 +43,11 @@ public:
         llvm::sys::DynamicLibrary::LoadLibraryPermanently( nullptr );
     }
 
+    /// Get the TargetMachine, which can be used for target-specific optimizations.
     TargetMachine& getTargetMachine() { return *m_target; }
 
+    /// Add the given module to the JIT engine, yielding a key that can be
+    /// used for subsequent symbol lookups.
     VModuleKey addModule( std::unique_ptr<Module> module )
     {
         VModuleKey key = m_session.allocateVModule();
@@ -50,11 +55,13 @@ public:
         return key;
     }
 
+    /// Remove the module with the specified key from the JIT engine.
     void removeModule( VModuleKey key )
     {
         cantFail( m_compileLayer.removeModule( key ) );
     }
 
+    /// Find the specified symbol in the module with the given key.
     JITSymbol findSymbol( VModuleKey key, const std::string name )
     {
         return m_compileLayer.findSymbolIn( key, name, false /*ExportedSymbolsOnly*/ );
@@ -72,6 +79,7 @@ private:
     ObjLayerT                       m_objectLayer;
     CompileLayerT                   m_compileLayer;
 
+    // Perform prerequisite initialization.
     bool init()
     {
         InitializeNativeTarget();
