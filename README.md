@@ -25,3 +25,66 @@ It consists of the following components:
 - A simple code generator that contructs LLVM IR.
 
 - Optimization and JIT code generation using off-the-shelf LLVM components.
+
+# Grammar
+
+The source language is a subset of C with the following grammar:
+
+```  
+  Prog -> FuncDef+
+  
+  FuncDef -> Type FuncId ( VarDecl* ) Seq
+  
+  Type -> bool | int
+  
+  FuncId -> Id | operator BinaryOp
+  
+  VarDecl -> Type Id
+  
+  Seq -> { Stmt* }
+  
+  Stmt -> Id = Exp ;
+        | Id ( Args ) ;
+        | VarDecl ;
+        | Seq
+        | return Exp ;
+        | if ( Exp ) Stmt
+        | if ( Exp ) Stmt else Stmt
+        | while ( Exp ) Stmt
+  
+  Args -> Exp
+        | Exp , Args
+  
+  Exp -> true | false
+       | Num
+       | Id
+       | Id ( Args )
+       | ( Exp )
+       | UnaryOp Exp
+       | Exp BinaryOp Exp
+  
+  UnaryOp  ->  -  |  !
+  BinaryOp ->  *  |  /  |  %
+            |  +  |  -
+            |  <  |  <= |  >  |  >=
+            |  == |  !=
+```
+
+# Source files
+
+Here is an overview of the source files:
+
+- `main.cpp`: calls the lexer, parser, typechecker, and code generator
+- `Token.h`: lexical tokens, e.g. constants, identifiers, and keywords.
+- `Lexer.re`: regular expressions for lexical tokens (compiled by re2c)
+- `TokenStream.h`: adapter that calls Lexer to produce a stream of tokens.
+- `Parser.cpp`: recursive descent parser, which reads token stream and produces a syntax tree.
+- `Exp.h Stmt.h VarDecl FuncDef.h Program.h`: syntax trees for expressions, statements, functions, etc.
+- `Visitor.h`: visitor pattern for syntax traversal
+- `Printer.h`: print syntax tree using Visitor
+- `Typechecker.h`: a typechecker that supports overloading.
+- `Scope.h`: scoped symbol table used by the typechecker.
+- `Builtins.h`: declarations of built-in operators
+- `Codegen.cpp`: generates LLVM IR from syntax tree
+- `SimpleJit.h: encapsulates LLVM ORC JIT engine
+
