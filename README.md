@@ -76,6 +76,20 @@ Notation:
 - `VarDecl*` indicates zero or more variable declarations
 - Other punctuation characters are program literals (e.g. parentheses, braces, semicolon, comma).
 
+Example:
+```
+int main(int x)
+{
+    int sum = 0;
+    int i = 1;
+    while (i <= x)
+    {
+        sum = sum + i;
+        i = i + 1;
+    }
+}
+
+```
 
 # Source files
 
