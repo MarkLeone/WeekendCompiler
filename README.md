@@ -28,7 +28,7 @@ It consists of the following components:
 
 # Grammar
 
-The source language is a subset of C with the following grammar:
+The source language is a subset of C with the following grammar.
 
 ```  
   Prog -> FuncDef+
@@ -70,6 +70,13 @@ The source language is a subset of C with the following grammar:
             |  == |  !=
 ```
 
+Notation:
+- `Prog -> FuncDef+` indicates that a program consists of one or more function definitions.
+- `Exp -> true | false | ...` indicates that an expression can be a `true` or `false` keyword, etc.
+- `VarDecl*` indicates zero or more variable declarations
+- Other punctuation characters are program literals (e.g. parentheses, braces, semicolon, comma).
+
+
 # Source files
 
 Here is an overview of the source files:
@@ -86,5 +93,5 @@ Here is an overview of the source files:
 - `Scope.h`: scoped symbol table used by the typechecker.
 - `Builtins.h`: declarations of built-in operators
 - `Codegen.cpp`: generates LLVM IR from syntax tree
-- `SimpleJit.h: encapsulates LLVM ORC JIT engine
+- `SimpleJit.h`: encapsulates LLVM ORC JIT engine
 
