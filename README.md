@@ -109,3 +109,18 @@ Here is an overview of the source files:
 - `Codegen.cpp`: generates LLVM IR from syntax tree
 - `SimpleJit.h`: encapsulates LLVM ORC JIT engine
 
+# Building
+
+Prerequisites:
+
+- CMake 3.1+: https://cmake.org/download/
+- LLVM 7.0:  http://releases.llvm.org/download.html
+- re2c 1.2: https://github.com/skvadrik/re2c/releases
+
+  - (Note that building re2c under Windows is easiest via cygwin or mingw.)
+
+The Weekend Compiler project is built with CMake.  From the command line, the locations of LLVM and re2c can be specified as follows:
+
+  cmake -D LLVM_ROOT_DIR=C:/LLVM-7.1 -D RE2C_EXE=C:/re2c-1.2.1/bin/re2c.exe
+
+Alternatively these locations can be specified via cmake-gui.
