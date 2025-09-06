@@ -112,7 +112,7 @@ std::vector<ExpPtr> parseArgs( TokenStream& tokens )
     }
     skipToken( kTokenRparen, tokens );
 
-    return std::move( exps );
+    return exps;
 }
 
 

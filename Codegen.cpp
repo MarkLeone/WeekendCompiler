@@ -449,5 +449,5 @@ std::unique_ptr<Module> Codegen(LLVMContext* context, const Program& program)
     {
         CodegenFunc( context, module.get(), &functions ).Codegen( funcDef.get() );
     }
-    return std::move( module );
+    return module;
 }
