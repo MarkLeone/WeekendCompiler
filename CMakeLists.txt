@@ -17,6 +17,11 @@ if(MSVC)
   add_compile_options(/W4)
 else()
   add_compile_options(-Wall -Wextra -Wpedantic)
+  # Suppress warnings from LLVM headers (older LLVM with newer C++ compiler)
+  add_compile_options(-Wno-deprecated-declarations)
+  add_compile_options(-Wno-unused-parameter)
+  add_compile_options(-Wno-mismatched-new-delete)
+  add_compile_options(-Wno-redundant-move)
 endif()
 
 # Include ExternalProject module
