@@ -8,17 +8,21 @@
 #include "TokenStream.h"
 #include "Typechecker.h"
 
-#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/PassManager.h>
-#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Target/TargetMachine.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/MC/TargetRegistry.h>
+#include <llvm/TargetParser/Host.h>
 
 #include <fstream>
 #include <iostream>
+#include <string>
 
 #ifndef OPT_LEVEL
 /// Optimization level, which defaults to -O2.
@@ -54,21 +58,48 @@ int parseAndTypecheck( const char* source, Program* program )
 
 int main( int argc, const char* const* argv )
 {
+    // Initialize LLVM target infrastructure early
+    SimpleJIT::initializeLLVM();
+    
     // Get command-line arguments.
-    if( argc != 3 )
+    if( argc < 3 || argc > 4 )
     {
-        std::cerr << "Usage: " << argv[0] << " <filename> <inputValue>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " [-O0|-O1|-O2|-O3] <filename> <inputValue>" << std::endl;
+        std::cerr << "  -O0: no optimization, -O1: basic, -O2: default, -O3: aggressive" << std::endl;
         return -1;
     }
-    const char* filename = argv[1];
-    int inputValue = atoi( argv[2] );
+    
+    // Parse optimization level and arguments
+    int optLevel = OPT_LEVEL; // default
+    const char* filename;
+    int inputValue;
+    
+    if( argc == 3 ) {
+        // No optimization flag provided, use default
+        filename = argv[1];
+        inputValue = atoi( argv[2] );
+    } else {
+        // Optimization flag provided
+        std::string optArg = argv[1];
+        if( optArg == "-O0" ) optLevel = 0;
+        else if( optArg == "-O1" ) optLevel = 1;
+        else if( optArg == "-O2" ) optLevel = 2;
+        else if( optArg == "-O3" ) optLevel = 3;
+        else {
+            std::cerr << "Invalid optimization level: " << optArg << std::endl;
+            std::cerr << "Use -O0, -O1, -O2, or -O3" << std::endl;
+            return -1;
+        }
+        filename = argv[2];
+        inputValue = atoi( argv[3] );
+    }
 
     // Read source file.  TODO: use an input stream, rather than reading the entire file.
     std::vector<char> source;
-    int status = readFile( argv[1], &source );
+    int status = readFile( filename, &source );
     if( status != 0 )
     {
-        std::cerr << "Unable to open input file: " << argv[1] << std::endl;
+        std::cerr << "Unable to open input file: " << filename << std::endl;
         return status;
     }
 
@@ -91,21 +122,30 @@ int main( int argc, const char* const* argv )
     // Verify the module, which catches malformed instructions and type errors.
     assert(!verifyModule(*module, &llvm::errs()));
 
-    // Construct JIT engine and use data layout for target-specific optimizations.
+    // Construct JIT engine.
     SimpleJIT jit;
-    module->setDataLayout( jit.getTargetMachine().createDataLayout() );
+    // Note: Data layout is automatically handled by LLJIT in LLVM 19
 
     // Optimize the module.
-    optimize( module.get(), OPT_LEVEL );
+    optimize( module.get(), optLevel );
     dumpIR( *module, filename, "optimized" );
 
     // Use the JIT engine to generate native code.
-    VModuleKey key = jit.addModule( std::move(module) );
+    auto addResult = jit.addModule( std::move(module) );
+    if (addResult) {
+        std::cerr << "Failed to add module to JIT: " << toString(std::move(addResult)) << std::endl;
+        return -1;
+    }
 
     // Get the main function pointer.
-    JITSymbol mainSymbol = jit.findSymbol( key, "main" );
+    auto mainSymbolResult = jit.findSymbol( "main" );
+    if (!mainSymbolResult) {
+        std::cerr << "Failed to find main symbol: " << toString(mainSymbolResult.takeError()) << std::endl;
+        return -1;
+    }
+    
     typedef int ( *MainFunc )( int );
-    MainFunc mainFunc = reinterpret_cast<MainFunc>( cantFail( mainSymbol.getAddress() ) );
+    MainFunc mainFunc = reinterpret_cast<MainFunc>( mainSymbolResult->getValue() );
 
     // Call the main function using the input value from the command line.
     int result = mainFunc(inputValue);
@@ -119,21 +159,59 @@ namespace {
 // Optimize the module using the given optimization level (0 - 3).
 void optimize( Module* module, int optLevel )
 {
-    // Construct the function and module pass managers, which are populated
-    // with standard optimizations (e.g. constant propagation, inlining, etc.)
-    legacy::FunctionPassManager functionPasses( module );
-    legacy::PassManager         modulePasses;
-
-    // Populate the pass managers based on the optimization level.
-    PassManagerBuilder builder;
-    builder.OptLevel = optLevel;
-    builder.populateFunctionPassManager( functionPasses );
-    builder.populateModulePassManager( modulePasses );
-
-    // Run the function passes, then the module passes.
-    for( Function& function : *module )
-        functionPasses.run( function );
-    modulePasses.run( *module );
+    // Ensure LLVM target infrastructure is initialized
+    SimpleJIT::initializeLLVM();
+    
+    // Skip optimization for O0
+    if (optLevel == 0) {
+        return;
+    }
+    
+    // Create a simple target machine for optimization
+    auto targetTriple = llvm::sys::getDefaultTargetTriple();
+    std::string error;
+    auto target = llvm::TargetRegistry::lookupTarget(targetTriple, error);
+    if (!target) {
+        llvm::errs() << "Warning: Could not find target for optimization: " << error << "\n";
+        return;
+    }
+    
+    auto targetMachine = target->createTargetMachine(
+        targetTriple, "generic", "", llvm::TargetOptions{}, std::nullopt);
+    if (!targetMachine) {
+        llvm::errs() << "Warning: Could not create target machine for optimization\n";
+        return;
+    }
+    
+    // Create analysis managers
+    llvm::LoopAnalysisManager LAM;
+    llvm::FunctionAnalysisManager FAM;
+    llvm::CGSCCAnalysisManager CGAM;
+    llvm::ModuleAnalysisManager MAM;
+    
+    // Create pass builder with target machine
+    llvm::PipelineTuningOptions PTO;
+    llvm::PassBuilder PB(targetMachine, PTO);
+    
+    // Register analysis managers in the correct order (from LLVM opt tool)
+    PB.registerModuleAnalyses(MAM);
+    PB.registerCGSCCAnalyses(CGAM);
+    PB.registerFunctionAnalyses(FAM);
+    PB.registerLoopAnalyses(LAM);
+    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+    
+    // Configure optimization level
+    llvm::OptimizationLevel level;
+    switch(optLevel) {
+        case 1: level = llvm::OptimizationLevel::O1; break;
+        case 2: level = llvm::OptimizationLevel::O2; break;
+        case 3: level = llvm::OptimizationLevel::O3; break;
+        default: level = llvm::OptimizationLevel::O2; break;
+    }
+    
+    // Build and run the optimization pipeline
+    llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(level);
+    MPM.run(*module, MAM);
 }
 
 // Read file into the given buffer.  Returns zero for success.

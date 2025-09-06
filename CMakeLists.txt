@@ -62,17 +62,9 @@ add_custom_command(
   VERBATIM
 )
 
-set(LLVM_STATIC TRUE)
-
-# Try modern LLVM config first
-find_package(LLVM QUIET CONFIG)
-
-# If modern config failed, use custom FindLLVM.cmake
-if(NOT LLVM_FOUND)
-  message(STATUS "Modern LLVM config not found, falling back to custom FindLLVM.cmake")
-  list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_SOURCE_DIR}")
-  find_package(LLVM REQUIRED)
-endif()
+# Find LLVM.  User can specify LLVM_DIR if LLVM is in a non-standard location:
+# cmake -DLLVM_DIR=/path/to/llvm/lib/cmake/llvm ..
+find_package(LLVM REQUIRED CONFIG)
 
 # Create the main executable
 add_executable(weekend
@@ -89,20 +81,22 @@ add_executable(weekend
 target_include_directories(weekend 
   PRIVATE 
     ${CMAKE_SOURCE_DIR}
+    ${LLVM_INCLUDE_DIRS}
 )
 
-# Handle both modern and legacy LLVM configurations
-if(TARGET LLVM::LLVM)
-  # Modern LLVM config provides imported targets
-  target_link_libraries(weekend PRIVATE LLVM::LLVM)
-else()
-  # Legacy FindLLVM.cmake provides variables
-  target_include_directories(weekend PRIVATE ${LLVM_INCLUDE_DIRS})
-  target_link_libraries(weekend PRIVATE ${LLVM_LIBRARY})
-  if(LLVM_DEFINITIONS)
-    target_compile_definitions(weekend PRIVATE ${LLVM_DEFINITIONS})
-  endif()
-  # Link against C++ standard library for RTTI support
-  target_link_libraries(weekend PRIVATE stdc++)
-endif()
+# Link against LLVM libraries
+target_link_libraries(weekend PRIVATE 
+    LLVMCore
+    LLVMSupport
+    LLVMExecutionEngine
+    LLVMOrcJIT
+    LLVMOrcShared
+    LLVMOrcTargetProcess
+    LLVMTarget
+    LLVMX86CodeGen
+    LLVMX86AsmParser
+    LLVMX86Desc
+    LLVMX86Disassembler
+    LLVMX86Info
+)
 

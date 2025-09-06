@@ -10,6 +10,7 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Support/raw_ostream.h>
+#include <map>
 
 using namespace llvm;
 
@@ -117,7 +118,7 @@ class CodegenExp : public ExpVisitor, CodegenBase
             case VarDecl::kParam:
                 return value;
             case VarDecl::kLocal:
-                return GetBuilder()->CreateLoad( value, varDecl->GetName() );
+                return GetBuilder()->CreateLoad( ConvertType(varDecl->GetType()), value, varDecl->GetName() );
         }
         assert(false && "unreachable");
         return nullptr;
@@ -185,7 +186,7 @@ class CodegenExp : public ExpVisitor, CodegenBase
         Function* function = it->second;
 
         // Generate LLVM function call.
-        return GetBuilder()->CreateCall( function, args, funcDef->GetName() );
+        return GetBuilder()->CreateCall( function->getFunctionType(), function, args, funcDef->GetName() );
     }
 
   private:

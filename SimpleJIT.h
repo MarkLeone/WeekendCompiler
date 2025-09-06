@@ -1,12 +1,7 @@
 #pragma once
 
-#include <llvm/ExecutionEngine/ExecutionEngine.h>
-#include <llvm/ExecutionEngine/JITSymbol.h>
-#include <llvm/ExecutionEngine/Orc/CompileUtils.h>
-#include <llvm/ExecutionEngine/Orc/IRCompileLayer.h>
-#include <llvm/ExecutionEngine/Orc/LambdaResolver.h>
-#include <llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h>
-#include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
+#include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
@@ -20,73 +15,72 @@ using namespace llvm::orc;
 
 /// A simple JIT engine that encapsulates the LLVM ORC JIT API.
 /// (JIT = Just In Time, ORC = On Request Compilation)
-/// Adapted from the LLVM KaleidoscopeJIT example.
 class SimpleJIT {
 public:
-    /// Construct JIT engine, initializing the resolver, object layer, and compile layer.
-    SimpleJIT() :
-        m_initialized( init() ),
-        m_resolver
-        (createLegacyLookupResolver
-           ( m_session,
-             [this](const std::string& name) {
-                 return m_objectLayer.findSymbol(name, true);
-             },
-             [](Error Err) { cantFail(std::move(Err), "lookupFlags failed"); })),
-          m_target(EngineBuilder().selectTarget()), m_dataLayout(m_target->createDataLayout()),
-          m_objectLayer(m_session,
-                      [this](VModuleKey)
-                      { return ObjLayerT::Resources
-                              { std::make_shared<SectionMemoryManager>(), m_resolver};
-                      }),
-          m_compileLayer(m_objectLayer, SimpleCompiler(*m_target))
-    {
-        llvm::sys::DynamicLibrary::LoadLibraryPermanently( nullptr );
+    /// Construct JIT engine, initializing the execution session and layers.
+    SimpleJIT() : m_initialized(false), m_jit(nullptr) {
+        m_initialized = init();
+        if (m_initialized) {
+            llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
+        }
     }
 
-    /// Get the TargetMachine, which can be used for target-specific optimizations.
-    TargetMachine& getTargetMachine() { return *m_target; }
-
-    /// Add the given module to the JIT engine, yielding a key that can be
-    /// used for subsequent symbol lookups.
-    VModuleKey addModule( std::unique_ptr<Module> module )
-    {
-        VModuleKey key = m_session.allocateVModule();
-        cantFail( m_compileLayer.addModule( key, std::move( module ) ) );
-        return key;
-    }
-
-    /// Remove the module with the specified key from the JIT engine.
-    void removeModule( VModuleKey key )
-    {
-        cantFail( m_compileLayer.removeModule( key ) );
-    }
-
-    /// Find the specified symbol in the module with the given key.
-    JITSymbol findSymbol( VModuleKey key, const std::string name )
-    {
-        return m_compileLayer.findSymbolIn( key, name, false /*ExportedSymbolsOnly*/ );
-    }
-
-private:
-    using ObjLayerT     = RTDyldObjectLinkingLayer;
-    using CompileLayerT = IRCompileLayer<ObjLayerT, SimpleCompiler>;
-
-    bool                            m_initialized;
-    ExecutionSession                m_session;
-    std::shared_ptr<SymbolResolver> m_resolver;
-    std::unique_ptr<TargetMachine>  m_target;
-    const DataLayout                m_dataLayout;
-    ObjLayerT                       m_objectLayer;
-    CompileLayerT                   m_compileLayer;
-
-    // Perform prerequisite initialization.
-    bool init()
-    {
+    /// Initialize LLVM target infrastructure. This is safe to call multiple times.
+    /// Returns true if initialization was successful or already done.
+    static bool initializeLLVM() {
+        static bool initialized = false;
+        if (initialized) {
+            return true;
+        }
+        
         InitializeNativeTarget();
         InitializeNativeTargetAsmPrinter();
         InitializeNativeTargetAsmParser();
+        
+        initialized = true;
         return true;
     }
-    
+
+
+    /// Add the given module to the JIT engine.
+    Error addModule(std::unique_ptr<Module> module) {
+        if (!m_initialized) {
+            return make_error<StringError>("JIT not initialized", inconvertibleErrorCode());
+        }
+
+        // Create a new context for this module
+        auto context = std::make_unique<LLVMContext>();
+        ThreadSafeModule tsm(std::move(module), std::move(context));
+        return m_jit->addIRModule(std::move(tsm));
+    }
+
+    /// Find the specified symbol in the JIT.
+    Expected<ExecutorAddr> findSymbol(const std::string& name) {
+        if (!m_initialized) {
+            return make_error<StringError>("JIT not initialized", inconvertibleErrorCode());
+        }
+
+        return m_jit->lookup(name);
+    }
+
+private:
+    bool m_initialized;
+    std::unique_ptr<LLJIT> m_jit;
+
+    // Perform prerequisite initialization.
+    bool init() {
+        // Ensure LLVM target infrastructure is initialized
+        if (!initializeLLVM()) {
+            return false;
+        }
+
+        auto jitOrError = LLJITBuilder().create();
+        if (!jitOrError) {
+            return false;
+        }
+
+        m_jit = std::move(*jitOrError);
+
+        return true;
+    }
 };

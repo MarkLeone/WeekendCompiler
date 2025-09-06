@@ -114,13 +114,14 @@ Here is an overview of the source files:
 Prerequisites:
 
 - CMake: https://cmake.org/download/
-- LLVM 7.1:  http://releases.llvm.org/download.html
+- LLVM 19.1:  https://llvm.org/docs/GettingStarted.html
 
-The Weekend Compiler project is built with CMake.  From the command line, the locations of LLVM and re2c can be specified as follows:
+The Weekend Compiler project is built with CMake.  If necessary, the
+location of LLVM can be specified as follows:
 
-  cmake -DLLVM_ROOT_DIR=C:/LLVM-7.1 -DRE2C_EXE=C:/re2c-1.2.1/bin/re2c.exe
+  cmake -DLLVM_DIR=/path/to/llvm/lib/cmake/llvm .
 
-Alternatively these locations can be specified via cmake-gui.
+Alternatively this location can be specified via cmake-gui.
 
 The re2c tool is used to compile regular expressions in the lexer.  CMake
 automatically downloads it from https://github.com/skvadrik/re2c and builds it
