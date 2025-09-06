@@ -59,13 +59,18 @@ if(NOT LLVM_LIBPATH)
 endif()
 
 if(LLVM_STATIC)
+  # For static builds, try to find any core LLVM library
   find_library(LLVM_LIBRARY
-               NAMES LLVMAnalysis # first of a whole bunch of libs to get
+               NAMES 
+                 LLVMCore
+                 LLVMAnalysis
+                 LLVMSupport
                PATHS ${LLVM_LIBPATH})
 else()
   find_library(LLVM_LIBRARY
                NAMES
                  LLVM-${LLVM_VERSION}
+                 LLVMCore
                  LLVMAnalysis  # check for the static library as a fall-back
                PATHS ${LLVM_LIBPATH})
 endif()
@@ -76,13 +81,44 @@ if(LLVM_LIBRARY AND LLVM_ROOT_DIR AND LLVM_LIBPATH)
     OUTPUT_VARIABLE LLVM_INCLUDE_DIRS
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   if(LLVM_STATIC)
-    # if static LLVM libraries were requested, use llvm-config to generate
-    # the list of what libraries we need, and substitute that in the right
-    # way for LLVM_LIBRARY.
+    # if static LLVM libraries were requested, try to use llvm-config to generate
+    # the list of what libraries we need, but fall back to basic libraries if it fails
     execute_process(COMMAND ${LLVM_CONFIG} --libfiles
                     OUTPUT_VARIABLE LLVM_LIBRARY
-                    OUTPUT_STRIP_TRAILING_WHITESPACE)
-    string(REPLACE " " ";" LLVM_LIBRARY "${LLVM_LIBRARY}")
+                    ERROR_VARIABLE LLVM_CONFIG_ERROR
+                    OUTPUT_STRIP_TRAILING_WHITESPACE
+                    RESULT_VARIABLE LLVM_CONFIG_RESULT)
+    
+    if(NOT LLVM_CONFIG_RESULT EQUAL 0)
+      message(STATUS "llvm-config --libfiles failed, trying --libs all")
+      # Try using --libs all instead
+      execute_process(COMMAND ${LLVM_CONFIG} --libs all
+                      OUTPUT_VARIABLE LLVM_LIBRARY
+                      ERROR_VARIABLE LLVM_CONFIG_ERROR
+                      OUTPUT_STRIP_TRAILING_WHITESPACE
+                      RESULT_VARIABLE LLVM_CONFIG_RESULT)
+      
+      if(NOT LLVM_CONFIG_RESULT EQUAL 0)
+        message(FATAL_ERROR "Both llvm-config --libfiles and --libs all failed")
+      else()
+        # Use -l flags directly, let the linker resolve them
+        string(REPLACE " " ";" LLVM_LIBRARY "${LLVM_LIBRARY}")
+      endif()
+    else()
+      string(REPLACE " " ";" LLVM_LIBRARY "${LLVM_LIBRARY}")
+    endif()
+    
+    # Also get system libraries that LLVM depends on
+    execute_process(COMMAND ${LLVM_CONFIG} --system-libs
+                    OUTPUT_VARIABLE LLVM_SYSTEM_LIBS
+                    ERROR_VARIABLE LLVM_CONFIG_ERROR
+                    OUTPUT_STRIP_TRAILING_WHITESPACE
+                    RESULT_VARIABLE LLVM_CONFIG_RESULT)
+    
+    if(LLVM_CONFIG_RESULT EQUAL 0)
+      string(REPLACE " " ";" LLVM_SYSTEM_LIBS "${LLVM_SYSTEM_LIBS}")
+      list(APPEND LLVM_LIBRARY ${LLVM_SYSTEM_LIBS})
+    endif()
   endif()
 endif()
 
