@@ -19,23 +19,45 @@ else()
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Find re2c executable
-find_program(RE2C_EXE 
-  NAMES re2c
-  PATHS ${CMAKE_PREFIX_PATH}
-  PATH_SUFFIXES bin
-  DOC "Path to re2c executable"
+# Include ExternalProject module
+include(ExternalProject)
+
+# Select the appropriate re2c preset based on the operating system
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(RE2C_PRESET "linux-gcc-release-ootree-skeleton-fast")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(RE2C_PRESET "macos-clang-release-ootree-skeleton-fast")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(RE2C_PRESET "windows-msvc-release-ootree-fast")
+else()
+  message(FATAL_ERROR "Unsupported operating system: ${CMAKE_SYSTEM_NAME}. Please add support for this platform.")
+endif()
+
+message(STATUS "Using re2c preset: ${RE2C_PRESET}")
+
+# Build re2c from source using ExternalProject
+ExternalProject_Add(
+  re2c
+  GIT_REPOSITORY https://github.com/skvadrik/re2c.git
+  GIT_TAG 4.3
+  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external/re2c
+  INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/external/re2c/install
+  CMAKE_ARGS
+    -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/external/re2c/install
+    -DRE2C_BUILD_TESTS=OFF
+    -DRE2C_BUILD_DOCS=OFF
+    -DCMAKE_PRESET_NAME=${RE2C_PRESET}
+  BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/external/re2c/install/bin/re2c
 )
 
-if(NOT RE2C_EXE)
-  message(FATAL_ERROR "re2c executable not found. Please install re2c or specify RE2C_EXE")
-endif()
+# Get the re2c executable path
+set(RE2C_EXE ${CMAKE_CURRENT_BINARY_DIR}/external/re2c/install/bin/re2c)
 
 # Generate Lexer.cpp from Lexer.re using re2c
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/Lexer.cpp
   COMMAND ${RE2C_EXE} -o ${CMAKE_CURRENT_BINARY_DIR}/Lexer.cpp ${CMAKE_SOURCE_DIR}/Lexer.re
-  DEPENDS ${CMAKE_SOURCE_DIR}/Lexer.re
+  DEPENDS ${CMAKE_SOURCE_DIR}/Lexer.re re2c
   COMMENT "Generating Lexer.cpp from Lexer.re"
   VERBATIM
 )
